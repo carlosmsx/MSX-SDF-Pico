@@ -78,3 +78,32 @@ fin:
 fin_est:
     wait 1 gpio 8
 .wrap
+
+; ---------------------------------------------------------------------------
+; espia: diagnostico, en el otro bloque PIO. En cada bajada de /IOSEL toma 8
+; fotos de GP0-GP10 (D0-D7, /IOSEL, A0, /RD) separadas por 33 ciclos
+; (~220 ns a 150 MHz) y las empuja al RX FIFO, unido para que entren las 8.
+; Solo lee pines: no necesita que los GPIO esten asignados a este bloque.
+; ---------------------------------------------------------------------------
+.program espia
+.fifo rx
+.wrap_target
+    wait 0 gpio 8
+    mov isr, pins
+    push noblock [31]
+    mov isr, pins
+    push noblock [31]
+    mov isr, pins
+    push noblock [31]
+    mov isr, pins
+    push noblock [31]
+    mov isr, pins
+    push noblock [31]
+    mov isr, pins
+    push noblock [31]
+    mov isr, pins
+    push noblock [31]
+    mov isr, pins
+    push noblock
+    wait 1 gpio 8
+.wrap

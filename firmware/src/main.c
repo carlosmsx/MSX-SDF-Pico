@@ -31,6 +31,8 @@
 
 static PIO pio = pio0;
 static uint sm_bus, sm_est;
+static PIO pio_espia = pio1;
+static uint sm_espia;
 static int dma_tx;
 static uint8_t contador[256];
 
@@ -76,6 +78,30 @@ static void bus_init(void)
     pio_sm_exec(pio, sm_est, pio_encode_set(pio_y, 1));
 
     pio_enable_sm_mask_in_sync(pio, (1u << sm_bus) | (1u << sm_est));
+
+    // Espia, en PIO1: solo lee los pines.
+    uint off_esp = pio_add_program(pio_espia, &espia_program);
+    sm_espia = pio_claim_unused_sm(pio_espia, true);
+    c = espia_program_get_default_config(off_esp);
+    sm_config_set_in_pin_base(&c, PIN_D0);
+    pio_sm_init(pio_espia, sm_espia, off_esp, &c);
+    pio_sm_set_enabled(pio_espia, sm_espia, true);
+}
+
+// Imprime las 8 fotos de un acceso, tomadas cada ~220 ns desde la bajada de
+// /IOSEL. Espera a que esten las 8: el FIFO unido tiene justo ese lugar.
+static void espia_informe(void)
+{
+    uint nivel = pio_sm_get_rx_fifo_level(pio_espia, sm_espia);
+    if (nivel < 8)
+        return;
+    printf("espia:\n");
+    for (int i = 0; i < 8; i++) {
+        uint32_t g = pio_sm_get(pio_espia, sm_espia);
+        printf("  %5d ns  /IOSEL=%d A0=%d /RD=%d  D=%02lX\n", i * 220,
+               (int)((g >> PIN_IOSEL) & 1), (int)((g >> PIN_A0) & 1),
+               (int)((g >> PIN_RD) & 1), (unsigned long)((g >> PIN_D0) & 0xFF));
+    }
 }
 
 static void estado(uint8_t v)
@@ -123,6 +149,8 @@ int main(void)
         if (iosel_ant && !iosel)
             bajadas++;
         iosel_ant = iosel;
+
+        espia_informe();
 
         if (time_reached(prox_latido)) {
             prox_latido = make_timeout_time_ms(1000);
