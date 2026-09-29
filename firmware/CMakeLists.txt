@@ -27,3 +27,17 @@ target_link_libraries(sdf_pico
 )
 
 pico_add_extra_outputs(sdf_pico)
+
+# Variantes para buscar fallas, con el mismo codigo:
+#   sdf_pico_escucha  la Pico nunca maneja el bus (para probar el cableado)
+#   sdf_pico_diag     latido por segundo y espia de 8 fotos por acceso
+foreach(variante escucha diag)
+    add_executable(sdf_pico_${variante} src/main.c)
+    pico_generate_pio_header(sdf_pico_${variante} ${CMAKE_CURRENT_LIST_DIR}/src/bus.pio)
+    pico_enable_stdio_usb(sdf_pico_${variante} 1)
+    pico_enable_stdio_uart(sdf_pico_${variante} 0)
+    target_link_libraries(sdf_pico_${variante} pico_stdlib hardware_pio hardware_dma)
+    pico_add_extra_outputs(sdf_pico_${variante})
+endforeach()
+target_compile_definitions(sdf_pico_escucha PRIVATE SOLO_ESCUCHA=1)
+target_compile_definitions(sdf_pico_diag PRIVATE SOLO_ESCUCHA=1 DIAGNOSTICO=1)

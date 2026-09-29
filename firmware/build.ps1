@@ -52,3 +52,4 @@ if ($LASTEXITCODE -ne 0) { throw "Fallo la compilacion" }
 & "$Tools\bin\arm-none-eabi-size.exe" (Join-Path $Build "sdf_pico.elf")
 Write-Host ""
 Write-Host "Listo: $Build\sdf_pico.uf2"
+Write-Host "       (variantes: sdf_pico_escucha.uf2, sdf_pico_diag.uf2)"

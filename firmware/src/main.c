@@ -32,15 +32,21 @@
 static PIO pio = pio0;
 static uint sm_bus, sm_est;
 static PIO pio_espia = pio1;
-static uint sm_espia;
+static uint sm_espia;   // solo con DIAGNOSTICO
 static int dma_tx;
 static uint8_t contador[256];
 
 // SOLO_ESCUCHA=1: los pines de datos quedan como entradas del SIO, asi que la
 // PIO sigue leyendo y registrando todo pero nunca maneja el bus. Para probar
-// el cableado sin riesgo de pisar un ciclo del MSX.
+// el cableado sin riesgo de pisar un ciclo del MSX (sdf_pico_escucha.uf2).
 #ifndef SOLO_ESCUCHA
-#define SOLO_ESCUCHA 1
+#define SOLO_ESCUCHA 0
+#endif
+
+// DIAGNOSTICO=1: latido por segundo y espia (8 fotos del bus por acceso).
+// Imprime mucho: solo para buscar fallas de cableado o de tiempos.
+#ifndef DIAGNOSTICO
+#define DIAGNOSTICO 0
 #endif
 
 static void bus_init(void)
@@ -88,6 +94,9 @@ static void bus_init(void)
     pio_sm_exec(pio, sm_est, pio_encode_set(pio_y, 1));
 
     pio_enable_sm_mask_in_sync(pio, (1u << sm_bus) | (1u << sm_est));
+
+    if (!DIAGNOSTICO)
+        return;
 
     // Espia, en PIO1: solo lee los pines.
     uint off_esp = pio_add_program(pio_espia, &espia_program);
@@ -162,9 +171,10 @@ int main(void)
             bajadas++;
         iosel_ant = iosel;
 
-        espia_informe();
+        if (DIAGNOSTICO)
+            espia_informe();
 
-        if (time_reached(prox_latido)) {
+        if (DIAGNOSTICO && time_reached(prox_latido)) {
             prox_latido = make_timeout_time_ms(1000);
             uint32_t g = gpio_get_all();
             printf("vivo %lu  /IOSEL=%d A0=%d /RD=%d EN=%d  D=%02lX  "
