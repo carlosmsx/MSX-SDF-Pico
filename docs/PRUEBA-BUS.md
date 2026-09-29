@@ -6,13 +6,22 @@ lecturas.
 
 ## Preparación
 
-1. Compilar el firmware (`firmware\build.ps1`) y copiar `sdf_pico.uf2` a la
-   Pico en modo BOOTSEL.
-2. Conectar el USB de la Pico a la computadora y abrir la consola serie
-   (cualquier terminal; la velocidad no importa en USB). Cada acceso del MSX a
-   los puertos aparece ahí.
-3. Insertar el cartucho y encender el MSX. La EEPROM puede quedar montada: la
-   prueba no depende de ella.
+1. **Verificar el cableado** con el checklist de `hardware/cableado.pdf`, con
+   el cartucho fuera del MSX.
+2. **Retirar la EEPROM (U1).** La DiskROM del SDF-1 espera `/WAIT` y habla el
+   protocolo del ATmega: al arrancar consultaría puertos que este firmware no
+   contesta como ella espera. Sin la EEPROM, el MSX arranca directo en BASIC.
+3. **Grabar el firmware.** Con el cartucho fuera del MSX, mantener apretado el
+   botón BOOTSEL de la Pico y conectar el USB. Aparece una unidad `RP2350`:
+   copiar ahí `firmware/build/sdf_pico.uf2`. La Pico se reinicia sola.
+4. **Abrir la consola.** La Pico aparece como un puerto COM nuevo (Administrador
+   de dispositivos, "Puertos (COM y LPT)"). Abrirlo con PuTTY o el monitor
+   serie de VS Code; la velocidad no importa. La consola muestra solo los
+   accesos del MSX, así que al principio no aparece nada.
+5. **Encender el MSX** con el cartucho insertado. El USB puede quedar
+   conectado: el diodo separa las dos fuentes. El MSX tiene que arrancar
+   normalmente en BASIC; si no arranca, apagar y revisar el cableado antes de
+   seguir.
 
 ## Qué hace el firmware
 
@@ -58,6 +67,27 @@ Resultado esperado:
 | 40 | `4C` | Quedan 4 bytes en el FIFO y el DMA sigue en curso |
 
 La consola debe mostrar `OUT 01h = 01`, `OUT 00h = 41` y `OUT 01h = 02`.
+
+## Prueba de las ocho líneas de datos
+
+```basic
+50 OUT 1,1: FOR I=0 TO 7: OUT 0,2^I: PRINT INP(0);: NEXT: PRINT
+```
+
+Debe mostrar `1 2 4 8 16 32 64 128`, y la consola `OUT 00h = 01`, `02`, `04`,
+..., `80`. La consola comprueba cada línea en el sentido MSX a Pico, y la
+pantalla, ida y vuelta.
+
+## Si algo falla
+
+| Síntoma | Causa probable |
+|---|---|
+| El MSX no arranca | Corto en el bus de datos, o la Pico maneja el bus fuera de tiempo. Retirar la Pico del circuito (desoldar o cortar `/IOSEL`) y probar |
+| `INP(1)` da `FF` y la consola no muestra nada con `OUT 1,1` | La Pico no ve los accesos: revisar `/IOSEL` (pin 11) y `EN` (pin 15; U5 pin 6 tiene que estar en ~3,3 V) |
+| La consola muestra los `OUT` pero `INP(1)` da `FF` | La Pico no llega a manejar el bus: revisar `/RD` (pin 14) y D0-D7 |
+| Un bit siempre en 0 o en 1, o dos bits intercambiados | Línea de datos cortada, en corto o cruzada: la línea 50 dice cuál |
+| La línea 30 da `0 1 2 3` y después `255` | El DMA no repone el FIFO |
+
 
 ## Qué medir con el analizador
 
