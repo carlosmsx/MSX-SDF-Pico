@@ -36,11 +36,21 @@ static uint sm_espia;
 static int dma_tx;
 static uint8_t contador[256];
 
+// SOLO_ESCUCHA=1: los pines de datos quedan como entradas del SIO, asi que la
+// PIO sigue leyendo y registrando todo pero nunca maneja el bus. Para probar
+// el cableado sin riesgo de pisar un ciclo del MSX.
+#ifndef SOLO_ESCUCHA
+#define SOLO_ESCUCHA 1
+#endif
+
 static void bus_init(void)
 {
     // Bus de datos: PIO, sin pulls (errata E9 del A2).
     for (uint pin = PIN_D0; pin < PIN_D0 + 8; pin++) {
-        pio_gpio_init(pio, pin);
+        if (SOLO_ESCUCHA)
+            gpio_init(pin);
+        else
+            pio_gpio_init(pio, pin);
         gpio_disable_pulls(pin);
     }
     pio_sm_set_consecutive_pindirs(pio, 0, PIN_D0, 8, false);
@@ -130,6 +140,8 @@ int main(void)
 {
     stdio_init_all();
     bus_init();
+    if (SOLO_ESCUCHA)
+        printf("SOLO_ESCUCHA: la Pico no maneja el bus\n");
     dma_init();
     estado(EST_VIVO);
 
