@@ -110,9 +110,36 @@ int main(void)
     bool eco = false;
     uint8_t ultimo_est = 0;
 
+    // Latido: una linea por segundo con el estado de los pines, para saber
+    // que el firmware corre y que llega cada senal aunque la PIO no vea nada.
+    // Las bajadas de /IOSEL las cuenta el nucleo mirando el pin: puede perder
+    // alguna, alcanza para diagnostico.
+    absolute_time_t prox_latido = make_timeout_time_ms(1000);
+    uint32_t latidos = 0, bajadas = 0, escrituras = 0;
+    bool iosel_ant = true;
+
     for (;;) {
+        bool iosel = gpio_get(PIN_IOSEL);
+        if (iosel_ant && !iosel)
+            bajadas++;
+        iosel_ant = iosel;
+
+        if (time_reached(prox_latido)) {
+            prox_latido = make_timeout_time_ms(1000);
+            uint32_t g = gpio_get_all();
+            printf("vivo %lu  /IOSEL=%d A0=%d /RD=%d EN=%d  D=%02lX  "
+                   "bajadas=%lu escrituras=%lu\n",
+                   (unsigned long)++latidos,
+                   (int)((g >> PIN_IOSEL) & 1), (int)((g >> PIN_A0) & 1),
+                   (int)((g >> PIN_RD) & 1), (int)((g >> PIN_EN) & 1),
+                   (unsigned long)((g >> PIN_D0) & 0xFF),
+                   (unsigned long)bajadas, (unsigned long)escrituras);
+        }
+
+
         if (!pio_sm_is_rx_fifo_empty(pio, sm_bus)) {
             uint32_t w = pio_sm_get(pio, sm_bus);
+            escrituras++;
             uint8_t dato = w & 0xFF;
             bool cmd = (w >> (PIN_A0 - PIN_D0)) & 1;
 
