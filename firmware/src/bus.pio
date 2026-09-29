@@ -1,0 +1,80 @@
+; Bus del MSX para el SDF-Pico: puertos 00h (datos) y 01h (comando/estado).
+;
+; Sin /WAIT: la linea esta cortada en la placa (corte 2 de las correcciones
+; de la rev1). EN queda fijo en alto, asi que /IOSEL es decodificacion pura:
+; el '245 esta abierto mientras dure el ciclo de I/O y /IOSEL sube recien
+; cuando termina. Todo lo que el Z80 pueda leer tiene que estar listo antes
+; del IN; si el dato no esta, el MSX lee FFh y el registro de estado es lo
+; que le avisa que no tenia que leer todavia.
+;
+; Pines (ver pins.h): D0-D7 = GP0-7, /IOSEL = GP8, A0 = GP9, /RD = GP10.
+; Base de IN y de OUT en GP0, 8 pines de OUT, desplazamiento a la derecha.
+
+.pio_version 1          ; RP2350: mov pindirs y mov osr, rxfifo[]
+
+; ---------------------------------------------------------------------------
+; sdf_bus: lecturas y escrituras de 00h, escrituras de 01h.
+;
+; Cada escritura se empuja al RX FIFO como una foto de los pines: D0-D7 en
+; los bits 0-7 y A0 en el bit 9, que distingue comando de dato.
+; Las lecturas de 00h salen del TX FIFO (lo llena el DMA o el nucleo);
+; con el FIFO vacio devuelven X, que vale FFh.
+;
+; jmp pin = /IOSEL. X = FFh, cargado desde el nucleo antes de arrancar.
+; ---------------------------------------------------------------------------
+.program sdf_bus
+.origin 0               ; out pc salta a direccion absoluta: la tabla va en 0-3
+    jmp leer            ; 0: IN  (00h)  datos
+    jmp fin             ; 1: IN  (01h)  estado, lo atiende sdf_estado
+    jmp escribir        ; 2: OUT (00h)  datos
+    jmp escribir        ; 3: OUT (01h)  comando
+public entrada:
+.wrap_target
+    wait 0 gpio 8       ; /IOSEL bajo: acceso a 00h/01h
+    mov osr, pins
+    out null, 9         ; descarta D0-D7 y /IOSEL
+    out pc, 2           ; salta segun A0 + 2 * /RD
+leer:
+    pull noblock        ; FIFO vacio: OSR = X (FFh)
+    out pins, 8
+    mov pindirs, ~null  ; el byte al bus
+    wait 1 gpio 10      ; /RD sube: el Z80 ya lo muestreo
+    mov pindirs, null
+    jmp fin
+escribir:
+    ; Hay maquinas en las que el dato llega tarde al conector en un OUT.
+    ; Se muestrea mientras /IOSEL este bajo y se guarda la ultima muestra
+    ; confirmada, como latchea el hardware real en el flanco de subida.
+    mov osr, pins
+    jmp pin guardar     ; /IOSEL ya subio: esta muestra no cuenta
+    mov isr, osr        ; confirmada: /IOSEL seguia bajo despues de tomarla
+    jmp escribir
+guardar:
+    push noblock
+fin:
+    wait 1 gpio 8       ; fin del ciclo de I/O
+.wrap
+
+; ---------------------------------------------------------------------------
+; sdf_estado: contesta IN (01h) con el registro de estado.
+;
+; El RX FIFO de esta SM esta en modo GET (PIO_FIFO_JOIN_TXGET): el nucleo
+; escribe el estado en rxf_putget[sm][0] cuando quiere, y la SM lo lee sin
+; consumirlo. Y = 1, cargado desde el nucleo antes de arrancar.
+; ---------------------------------------------------------------------------
+.program sdf_estado
+.fifo txget
+.wrap_target
+    wait 0 gpio 8
+    mov osr, pins
+    out null, 9
+    out x, 2            ; A0 + 2 * /RD
+    jmp x!=y fin_est    ; solo IN (01h)
+    mov osr, rxfifo[0]
+    out pins, 8
+    mov pindirs, ~null
+    wait 1 gpio 10
+    mov pindirs, null
+fin_est:
+    wait 1 gpio 8
+.wrap

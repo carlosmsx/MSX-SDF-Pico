@@ -1,0 +1,11 @@
+# --- Salidas de compilacion ---------------------------------------
+firmware/build/
+
+# --- Editores y sistema operativo ---------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+.DS_Store
