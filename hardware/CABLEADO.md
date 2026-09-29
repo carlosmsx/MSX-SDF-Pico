@@ -3,6 +3,10 @@
 El SDF-Pico usa una placa **SDF-1 rev1** con una sola modificación y la Pico 2
 en lugar del ATmega328P.
 
+Sirve tanto la Pico 2 como la **Pico 2 W**: tienen el mismo pinout, y los GPIO
+que la W reserva para el módulo inalámbrico (GP23 a GP25 y GP29) no salen a los
+pines ni se usan acá. El firmware se compila para la Pico 2 W.
+
 ## Modificación de la placa
 
 **Corte de la línea `/WAIT`.** Es el corte 2 de
@@ -33,7 +37,10 @@ R1 y C8 pueden quedar montados; no se conectan a nada.
 
 ## Cableado
 
-La Pico se monta del lado de componentes. Todas las señales del cartucho van
+La Pico se monta del lado de componentes, sobre el borde derecho del área
+universal, con la fila de pines 1 a 20 soldada a la placa y la fila 21 a 40
+hacia afuera. En los pads de U3 se sueldan tiras de pines, desde donde se
+cablea hasta la Pico. Todas las señales del cartucho van
 al lado izquierdo de la Pico (pines físicos 1 a 20): el bus del MSX en los
 pines 1 a 15 y la SD en los pines 16 a 20. Del lado derecho quedan solo la
 alimentación, el I2C y la UART.

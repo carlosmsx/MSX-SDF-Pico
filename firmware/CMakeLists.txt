@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
-set(PICO_BOARD pico2)
+# Pico 2 W: los GPIO 23-25 y 29 son del modulo inalambrico y no se usan.
+set(PICO_BOARD pico2_w)
 include(pico_sdk_import.cmake)
 
 project(sdf_pico C CXX ASM)
