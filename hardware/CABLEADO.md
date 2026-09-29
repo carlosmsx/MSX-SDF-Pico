@@ -37,6 +37,9 @@ R1 y C8 pueden quedar montados; no se conectan a nada.
 
 ## Cableado
 
+Hay una versión imprimible de esta sección, con el diodo y el checklist:
+[cableado.pdf](cableado.pdf). Se regenera con `python hardware/cableado_pdf.py`.
+
 La Pico se monta del lado de componentes, sobre el borde derecho del área
 universal, con la fila de pines 1 a 20 soldada a la placa y la fila 21 a 40
 hacia afuera. En los pads de U3 se sueldan tiras de pines, desde donde se
