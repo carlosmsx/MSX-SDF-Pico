@@ -421,6 +421,10 @@ WRSEC:
 	CALL	WaitReady		;el firmware guarda el sector
 	LD		A,10			;write fault, si no termina
 	JR		C,DSKIOERROR	;B = sectores que faltan
+	IN		A,(PORT_CMD)	;bit ERROR del estado: la SD no pudo grabar
+	RRCA					;(el firmware graba con el ultimo sector)
+	LD		A,10
+	JR		C,DSKIOERROR
 	DJNZ	WRSEC			;relative jump
 	LD		B,D				;restore n-sectors ;/\
 	SCF

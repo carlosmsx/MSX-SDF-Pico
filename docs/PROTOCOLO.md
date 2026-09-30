@@ -1,8 +1,8 @@
 # Protocolo entre la DiskROM y el firmware
 
 > **Estado:** implementado en los dos lados: la DiskROM (`diskrom/`) y el
-> firmware (`firmware/src/protocolo.c`), con el disco en la flash de la Pico
-> (`DISCO-FLASH.md`). Es el **protocolo 8**: el 7 del SDF-1 con el registro de
+> firmware (`firmware/src/protocolo.c`), con las imágenes en la tarjeta SD
+> (`SD.md`). Es el **protocolo 8**: el 7 del SDF-1 con el registro de
 > estado. `CALL SDFTEST` avisa si la ROM y el firmware no coinciden.
 
 ## Punto de partida
@@ -96,6 +96,21 @@ por cada sector:
     esperar OCUPADO = 0       el firmware escribe el sector en la SD
     si ERROR: salir con error
 ```
+
+El firmware junta los sectores en memoria y los graba en la SD todos juntos,
+con el último. Si la tarjeta falla, deja el bit `ERROR` del estado en 1; la
+DiskROM lo consulta después de la espera de cada sector y devuelve "write
+fault" al DOS.
+
+## Cuándo baja `OCUPADO`
+
+`OCUPADO` baja solamente cuando la respuesta está encolada **y no queda nada
+recibido sin procesar**. Si mientras el firmware ejecutaba un comando largo
+(un acceso a la SD) llegó otro comando, el estado sigue en `OCUPADO` hasta
+atenderlo: la DiskROM nunca lee por error la respuesta del comando anterior.
+
+Las tareas propias del firmware que tardan (reintentar la SD) también ponen
+`OCUPADO`, y solo empiezan si no hay una respuesta a medio leer.
 
 ## `CMD_DEBUG`, la excepción
 

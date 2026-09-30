@@ -153,6 +153,11 @@ void bus_tx_enviar(const void *datos, uint32_t n)
     dma_channel_configure(dma_tx, &d, &pio->txf[sm_bus], datos, n, true);
 }
 
+bool bus_tx_pendiente(void)
+{
+    return dma_channel_is_busy(dma_tx) || !pio_sm_is_tx_fifo_empty(pio, sm_bus);
+}
+
 void bus_estado(uint8_t v)
 {
     pio->rxf_putget[sm_est][0] = v;

@@ -1,9 +1,12 @@
 # Disco en la flash de la Pico
 
-Hasta que el SDF-Pico tenga la tarjeta SD, el disco A: vive en la flash de la
-Pico 2 W, a partir de 1 MB. Permite probar el protocolo y la DiskROM sin el
-módulo SD, y más adelante pasar a la tarjeta cambia solamente de dónde salen
-los sectores.
+> **Deshabilitado.** Fue el respaldo de prueba antes de la tarjeta SD
+> (`SD.md`). El código sigue en `firmware/src/disco.c` y la herramienta en
+> `tools/dsk2uf2.py`, pero el firmware actual no los compila ni los usa. Este
+> documento describe cómo funcionaba, en el firmware 0.2.
+
+El disco A: vivía en la flash de la Pico 2 W, a partir de 1 MB. Permitió
+probar el protocolo y la DiskROM sin el módulo SD.
 
 ## Qué admite
 

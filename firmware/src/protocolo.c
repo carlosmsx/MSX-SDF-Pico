@@ -3,8 +3,12 @@
 // Cada escritura del MSX llega como una palabra del anillo de bus.c. Un byte
 // en 01h es un comando: pone OCUPADO en el estado, descarta lo que hubiera
 // para leer y junta los parametros que siguen en 00h. Con los parametros
-// completos se ejecuta, se encola la respuesta por DMA y recien ahi se baja
-// OCUPADO. La ROM espera OCUPADO en 0 antes de leer (docs/PROTOCOLO.md).
+// completos se ejecuta y se encola la respuesta por DMA. La ROM espera
+// OCUPADO en 0 antes de leer (docs/PROTOCOLO.md).
+//
+// OCUPADO solo baja con la respuesta encolada Y el anillo vacio: si mientras
+// se ejecutaba un comando largo (la SD) llego otro, el estado sigue en
+// OCUPADO hasta atenderlo, y la ROM nunca lee la respuesta del anterior.
 //
 // La excepcion es CMD_DEBUG: la ROM lo manda entre sector y sector de un
 // CMD_READ, con el checksum del sector. No corta la lectura en curso.
@@ -14,7 +18,7 @@
 #include "pico/stdlib.h"
 #include "bus.h"
 #include "consola.h"
-#include "disco.h"
+#include "imagenes.h"
 #include "protocolo.h"
 
 // ---- Parametros de cada comando ----
@@ -47,41 +51,58 @@ static params_t params_de(uint8_t cmd)
 
 enum { E_LIBRE, E_PARAMS, E_DATOS, E_ECO };
 
-#define PAR_MAX 64
+#define PAR_MAX     64
+#define IO_SECTORES 255     // lo maximo que pide un DSKIO
 
 static int etapa = E_LIBRE;
 static uint8_t cmd;
 static uint8_t par[PAR_MAX];
 static int npar;
-static uint8_t resp[64];
+static uint8_t resp[128];
+
+// Los sectores de un DSKIO entero: se leen de la SD de una vez y salen por
+// DMA; en escritura se juntan aca y se graban al final.
+static uint8_t io_buf[IO_SECTORES * SECTOR];
 
 // CMD_READ en curso: para comparar el checksum que manda CMD_DEBUG
-static uint32_t lec_sector, lec_quedan;
+static const uint8_t *lec_ptr;
+static uint32_t lec_quedan;
 
 // CMD_WRITE en curso
-static uint32_t esc_sector, esc_quedan, esc_n;
-static uint8_t esc_buf[SECTOR];
+static uint8_t esc_drive;
+static uint32_t esc_sector, esc_total, esc_n;
 
 static uint8_t contador[256];
 
 static struct {
     uint32_t lecturas, escrituras, sectores_leidos, sectores_escritos;
-    uint32_t chk_ok, chk_mal, errores_flash;
+    uint32_t chk_ok, chk_mal, errores;
+    absolute_time_t desde;
 } st;
 
-static void listo(void)
+// ---- Registro de estado ----
+
+static bool libre;          // la respuesta esta encolada: el Z80 puede leer
+static bool error_st;       // el ultimo comando termino con error
+static uint8_t publicado;
+
+static void publicar(uint8_t v)
 {
-    bus_estado(EST_FIJO);
+    if (v != publicado) {
+        bus_estado(v);
+        publicado = v;
+    }
 }
 
 static void ocupado(void)
 {
-    bus_estado(EST_FIJO | EST_OCUPADO);
+    libre = false;
+    publicar(EST_FIJO | EST_OCUPADO | (error_st ? EST_ERROR : 0));
 }
 
-static void responder(uint32_t n)
+static void soltar(void)
 {
-    bus_tx_enviar(resp, n);
+    libre = true;   // el bucle publica "listo" cuando el anillo este vacio
 }
 
 static bool params_completos(void)
@@ -99,35 +120,20 @@ static bool params_completos(void)
 
 // ---- Comandos del disco ----
 
-static uint8_t dskio_validar(uint8_t drive, uint32_t sector, uint32_t n, bool escritura)
-{
-    if (drive != 0)
-        return DSKIO_ERR_NOT_READY;
-    // En blanco no se puede leer, pero si escribir: asi se formatea.
-    if (!escritura && disco_media() == 0)
-        return DSKIO_ERR_NOT_READY;
-    uint32_t total = escritura ? DISCO_SECTORES_MAX : disco_sectores();
-    if (n == 0 || sector + n > total)
-        return DSKIO_ERR_RECORD_NOT_FOUND;
-    return 0;
-}
-
 static void cmd_read(void)
 {
     // drive, sectores, media, direccion (H, L), sector (H, L)
     uint32_t n = par[1], sector = (par[5] << 8) | par[6];
-    uint8_t err = dskio_validar(par[0], sector, n, false);
+    uint8_t err = img_leer(par[0], sector, n, io_buf);
     st.lecturas++;
+    bus_tx_byte(err);
     if (err) {
-        con_printf("READ %lu+%lu: error %u\n", (unsigned long)sector,
-                   (unsigned long)n, err);
-        bus_tx_byte(err);
+        con_printf("READ %c: %lu+%lu: error %u\n", 'A' + par[0],
+                   (unsigned long)sector, (unsigned long)n, err);
         return;
     }
-    // El estado va por el FIFO, los sectores por DMA directo de la flash.
-    bus_tx_byte(0);
-    bus_tx_enviar(disco_ptr(sector), n * SECTOR);
-    lec_sector = sector;
+    bus_tx_enviar(io_buf, n * SECTOR);
+    lec_ptr = io_buf;
     lec_quedan = n;
     st.sectores_leidos += n;
 }
@@ -137,60 +143,102 @@ static void cmd_debug(void)
     // Checksum XOR del sector que la ROM acaba de leer.
     if (lec_quedan == 0)
         return;
-    const uint8_t *p = disco_ptr(lec_sector);
     uint8_t x = 0;
     for (int i = 0; i < SECTOR; i++)
-        x ^= p[i];
+        x ^= lec_ptr[i];
     if (x == par[0]) {
         st.chk_ok++;
     } else {
         st.chk_mal++;
-        con_printf("checksum del sector %lu: MSX %02X, Pico %02X\n",
-                   (unsigned long)lec_sector, par[0], x);
+        con_printf("checksum: MSX %02X, Pico %02X\n", par[0], x);
     }
-    lec_sector++;
+    lec_ptr += SECTOR;
     lec_quedan--;
 }
 
 static void cmd_write(void)
 {
     uint32_t n = par[1], sector = (par[5] << 8) | par[6];
-    uint8_t err = dskio_validar(par[0], sector, n, true);
+    uint8_t err = img_validar_escritura(par[0], sector, n, par[2]);
     st.escrituras++;
+    bus_tx_byte(err);
     if (err) {
-        con_printf("WRITE %lu+%lu: error %u\n", (unsigned long)sector,
-                   (unsigned long)n, err);
-        bus_tx_byte(err);
+        con_printf("WRITE %c: %lu+%lu: error %u\n", 'A' + par[0],
+                   (unsigned long)sector, (unsigned long)n, err);
         return;
     }
-    bus_tx_byte(0);
+    esc_drive = par[0];
     esc_sector = sector;
-    esc_quedan = n;
+    esc_total = n * SECTOR;
     esc_n = 0;
     etapa = E_DATOS;
 }
 
 static void dato_de_escritura(uint8_t b)
 {
-    // OCUPADO desde el primer byte de cada sector hasta que queda guardado:
-    // la ROM nueva espera eso despues de cada sector.
-    if (esc_n == 0)
+    // OCUPADO desde el primer byte de cada sector hasta tenerlo: la ROM
+    // espera eso despues de cada sector. Los sectores se juntan en memoria y
+    // van a la SD todos juntos con el ultimo, que es el que tarda.
+    if (esc_n % SECTOR == 0)
         ocupado();
-    esc_buf[esc_n++] = b;
-    if (esc_n < SECTOR)
+    io_buf[esc_n++] = b;
+    if (esc_n % SECTOR)
         return;
 
-    esc_n = 0;
-    if (!disco_escribir(esc_sector, esc_buf))
-        st.errores_flash++;
-    st.sectores_escritos++;
-    esc_sector++;
-    if (--esc_quedan == 0) {
-        if (!disco_vaciar())
-            st.errores_flash++;
+    if (esc_n == esc_total) {
+        uint8_t err = img_escribir(esc_drive, esc_sector, esc_total / SECTOR, io_buf);
+        if (err) {
+            // La ROM lo ve en el bit ERROR del estado, despues del ultimo sector.
+            st.errores++;
+            error_st = true;
+            con_printf("WRITE %c: fallo la SD\n", 'A' + esc_drive);
+        }
+        st.sectores_escritos += esc_total / SECTOR;
         etapa = E_LIBRE;
     }
-    listo();
+    soltar();
+}
+
+// ---- CALL SDFNEW ----
+
+static absolute_time_t nueva_aviso;
+
+// Llenar la imagen de ceros puede pasar el limite de espera de la ROM. Cada
+// segundo se le da un SDFNEW_BUSY: lo lee, espera y vuelve a consultar.
+static void nueva_avance(void)
+{
+    if (!time_reached(nueva_aviso))
+        return;
+    bus_tx_byte(SDFNEW_BUSY);
+    publicar(EST_FIJO);
+    absolute_time_t fin = make_timeout_time_ms(3000);
+    while (bus_tx_pendiente() && !time_reached(fin))
+        ;
+    publicar(EST_FIJO | EST_OCUPADO);
+    nueva_aviso = make_timeout_time_ms(1000);
+}
+
+// ---- CALL SDFDEBUG ----
+
+// Las cuentas desde el SDFDEBUG anterior, con el tiempo y la velocidad: sirve
+// para medir una prueba sin reloj en el MSX. Despues las pone en cero.
+static int informe(char *txt, int max)
+{
+    uint32_t ms = absolute_time_diff_us(st.desde, get_absolute_time()) / 1000;
+    uint32_t kb = (st.sectores_leidos + st.sectores_escritos) / 2;
+    uint32_t kbs10 = ms ? kb * 10000u / ms : 0;
+    int n = snprintf(txt, max,
+                     "R %lu/%lu W %lu/%lu CHK %lu/%lu\r\n"
+                     "%lu.%lu s %lu KB %lu.%lu KB/s\r\n",
+                     (unsigned long)st.lecturas, (unsigned long)st.sectores_leidos,
+                     (unsigned long)st.escrituras, (unsigned long)st.sectores_escritos,
+                     (unsigned long)st.chk_ok, (unsigned long)st.chk_mal,
+                     (unsigned long)(ms / 1000), (unsigned long)(ms % 1000 / 100),
+                     (unsigned long)kb,
+                     (unsigned long)(kbs10 / 10), (unsigned long)(kbs10 % 10));
+    memset(&st, 0, sizeof st);
+    st.desde = get_absolute_time();
+    return n + 1;   // con el 0 final
 }
 
 // ---- Ejecucion ----
@@ -204,36 +252,32 @@ static void ejecutar(void)
     case CMD_READ:      cmd_read();  break;
     case CMD_WRITE:     cmd_write(); break;
 
-    case CMD_DRIVES:    resp[n++] = 1; break;
-    case CMD_DSKCHG:    resp[n++] = 1; break;           // sin cambio
-    case CMD_DSKFMT: {
-        // En blanco se formatea como 720 KB.
-        uint8_t m = disco_media();
-        resp[n++] = par[0] != 0 ? 0 : (m ? m : 0xF9);
-        break;
-    }
+    case CMD_DRIVES:    resp[n++] = img_drives(); break;
+    case CMD_DSKCHG:    resp[n++] = img_cambio(par[0]); break;
+    case CMD_DSKFMT:    resp[n++] = img_media(par[0]); break;
 
     case CMD_RTCCHK:    resp[n++] = 0; break;           // sin reloj
     case CMD_RTCGET:    memset(resp, 0, 7); n = 7; break;
 
     case CMD_SDFTEST:
         resp[n++] = PROTOCOL_VERSION;
-        n += sprintf((char *)resp + n, "%s", FW_VERSION) + 1;
+        n += snprintf((char *)resp + n, 33, "%s\r\nSD %s", FW_VERSION, img_sd_texto()) + 1;
         break;
     case CMD_SDFDEBUG:
-        n = snprintf((char *)resp, sizeof resp - 1,
-                     "R %lu/%lu W %lu/%lu CHK %lu/%lu\r\n",
-                     (unsigned long)st.lecturas, (unsigned long)st.sectores_leidos,
-                     (unsigned long)st.escrituras, (unsigned long)st.sectores_escritos,
-                     (unsigned long)st.chk_ok, (unsigned long)st.chk_mal) + 1;
+        n = informe((char *)resp, sizeof resp);
         break;
 
-    // Sin SD todavia: los CALL SDF... contestan "Disk offline".
-    case CMD_SDFFILES:  resp[n++] = 0; break;           // lista vacia
-    case CMD_SDFMOUNT: case CMD_SDFUMOUNT: case CMD_SDFNEW:
-        resp[n++] = ERR_DISK_OFFLINE;
+    case CMD_SDFFILES:
+        bus_tx_enviar(io_buf, img_listar(io_buf, sizeof io_buf));
         break;
-    case CMD_SDFDRIVES: resp[n++] = par[0] == 1 ? 0 : ERR_ILLEGAL_FUNCTION; break;
+    case CMD_SDFMOUNT:  resp[n++] = img_montar(par[0], (char *)par + 2, par[1]); break;
+    case CMD_SDFUMOUNT: resp[n++] = img_desmontar(par[0]); break;
+    case CMD_SDFDRIVES: resp[n++] = img_poner_drives(par[0]); break;
+    case CMD_SDFNEW:
+        nueva_aviso = make_timeout_time_ms(1000);
+        resp[n++] = img_nueva(par[0], (char *)par + 2, par[1],
+                              io_buf, 64 * SECTOR, nueva_avance);
+        break;
 
     // Sin dispositivos todavia: DEVNAME no reconoce ningun nombre.
     case CMD_DEVNAME:   resp[n++] = DEV_NONE; break;
@@ -250,21 +294,20 @@ static void ejecutar(void)
     }
 
     if (n)
-        responder(n);
-    listo();    // en CMD_WRITE, para que la ROM lea el estado antes de los datos
+        bus_tx_enviar(resp, n);
+    soltar();   // en CMD_WRITE, para que la ROM lea el estado antes de los datos
 }
 
 static void comando(uint8_t c)
 {
     // CMD_DEBUG no corta la lectura en curso: solo junta su parametro.
     if (c != CMD_DEBUG) {
+        error_st = false;
         ocupado();
         bus_tx_cortar();
-        if (etapa == E_DATOS) {
-            con_printf("WRITE cortado: faltaban %lu sectores\n",
-                       (unsigned long)esc_quedan);
-            disco_vaciar();
-        }
+        if (etapa == E_DATOS)
+            con_printf("WRITE cortado: faltaban %lu bytes\n",
+                       (unsigned long)(esc_total - esc_n));
         lec_quedan = 0;
     }
     cmd = c;
@@ -300,16 +343,40 @@ static void dato(uint8_t b)
     }
 }
 
+// Sin SD (o si dejo de contestar) se reintenta cada medio segundo, con el
+// estado en OCUPADO mientras dura el intento y solo si no hay nada a medias.
+static void tarea_sd(void)
+{
+    static absolute_time_t prox;
+    if (img_sd_ok() || !libre || etapa != E_LIBRE || bus_tx_pendiente())
+        return;
+    if (!time_reached(prox))
+        return;
+    ocupado();
+    if (img_iniciar())
+        con_printf("SD ok\n");
+    prox = make_timeout_time_ms(500);
+    soltar();
+}
+
 void protocolo_core1(void)
 {
     for (int i = 0; i < 256; i++)
         contador[i] = (uint8_t)i;
 
+    // Antes de atender el bus: mientras tanto el MSX lee FFh en el estado,
+    // que para la ROM es OCUPADO, y espera.
+    con_printf("SD: %s\n", img_iniciar() ? "ok" : img_sd_texto());
+    st.desde = get_absolute_time();
+
     for (;;) {
-        listo();
+        publicado = 0;
+        ocupado();
         bus_despertar();
         con_printf("bus vivo: atendiendo 00h/01h\n");
         etapa = E_LIBRE;
+        error_st = false;
+        soltar();
 
         while (!bus_vigilar()) {
             while (bus_rx_hay()) {
@@ -320,10 +387,11 @@ void protocolo_core1(void)
                 else
                     dato(b);
             }
+            if (libre && !bus_rx_hay())
+                publicar(EST_FIJO | (error_st ? EST_ERROR : 0));
+            tarea_sd();
         }
 
-        if (etapa == E_DATOS)
-            disco_vaciar();
         con_printf("bus muerto (MSX apagado?): Pico en espera\n");
     }
 }

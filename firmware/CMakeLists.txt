@@ -14,9 +14,13 @@ set(FUENTES
     src/main.c
     src/bus.c
     src/protocolo.c
-    src/disco.c
+    src/imagenes.c
+    src/sd_spi.c
     src/consola.c
+    lib/fatfs/ff.c
 )
+# src/disco.c (el disco en la flash de la Pico, docs/DISCO-FLASH.md) quedo
+# fuera de la compilacion: fue el respaldo de prueba antes de la SD.
 
 # Una funcion arma cada variante con el mismo codigo:
 #   sdf_pico          el firmware
@@ -25,7 +29,8 @@ set(FUENTES
 function(firmware nombre)
     add_executable(${nombre} ${FUENTES})
     pico_generate_pio_header(${nombre} ${CMAKE_CURRENT_LIST_DIR}/src/bus.pio)
-    # Todo en RAM: la flash queda para el disco, y grabarla no frena el bus.
+    target_include_directories(${nombre} PRIVATE lib/fatfs)
+    # Todo en RAM: el nucleo que atiende el bus no depende de la cache de flash.
     pico_set_binary_type(${nombre} copy_to_ram)
     # La consola va por el USB nativo: la UART0 queda para los perifericos.
     pico_enable_stdio_usb(${nombre} 1)
@@ -33,10 +38,9 @@ function(firmware nombre)
     target_link_libraries(${nombre}
         pico_stdlib
         pico_multicore
-        pico_flash
         hardware_pio
         hardware_dma
-        hardware_flash
+        hardware_spi
     )
     pico_add_extra_outputs(${nombre})
 endfunction()

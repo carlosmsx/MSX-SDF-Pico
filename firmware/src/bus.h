@@ -25,6 +25,7 @@ uint32_t bus_rx_leer(void);
 void bus_tx_cortar(void);                         // descarta lo pendiente
 void bus_tx_byte(uint8_t b);                      // al FIFO; hay lugar tras cortar
 void bus_tx_enviar(const void *datos, uint32_t n);  // por DMA, de RAM o de flash
+bool bus_tx_pendiente(void);                      // queda algo que el MSX no leyo
 
 // Registro de estado, IN (01h).
 void bus_estado(uint8_t v);

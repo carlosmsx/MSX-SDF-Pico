@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PROTOCOL_VERSION  8   // el 7 del SDF-1, con registro de estado
-#define FW_VERSION        "SDF-Pico 0.2"
+#define FW_VERSION        "SDF-Pico 0.3"
 
 // Registro de estado, IN (01h). Ver docs/PROTOCOLO.md.
 #define EST_OCUPADO       0x80  // el firmware prepara la respuesta: no leer 00h
@@ -60,13 +60,25 @@
 #define CMD_GETDPB        0xFA
 
 // Errores de DSKIO, en el byte de estado de CMD_READ y CMD_WRITE
-#define DSKIO_ERR_NOT_READY         2
-#define DSKIO_ERR_RECORD_NOT_FOUND  8
+#define DSKIO_ERR_NOT_READY         2   // drive sin imagen, o la imagen ya no esta
+#define DSKIO_ERR_RECORD_NOT_FOUND  8   // sector fuera de la imagen
+#define DSKIO_ERR_WRITE_FAULT       10  // DPB de 720 KB en una imagen de 360, o fallo la SD
 
 // Errores de BASIC que contestan los comandos CALL SDF...
-#define ERR_ILLEGAL_FUNCTION  5
-#define ERR_DEVICE_IO         19
-#define ERR_DISK_OFFLINE      70
+#define ERR_ILLEGAL_FUNCTION      5
+#define ERR_DEVICE_IO             19
+#define ERR_FILE_NOT_FOUND        53
+#define ERR_BAD_FILE_NAME         56
+#define ERR_BAD_FILE_MODE         61    // la imagen no es de 360 ni de 720 KB
+#define ERR_BAD_DRIVE_NAME        62
+#define ERR_FILE_ALREADY_EXISTS   65
+#define ERR_DISK_FULL             66
+#define ERR_DISK_IO               69
+#define ERR_DISK_OFFLINE          70    // no hay SD, o todavia no inicializo
+
+// Mientras se crea la imagen de CALL SDFNEW, la ROM lee esto en lugar del
+// resultado y vuelve a consultar.
+#define SDFNEW_BUSY       0xFE
 
 #define DEV_NONE          0xFF
 
