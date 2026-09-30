@@ -9,3 +9,8 @@ firmware/build/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# --- MSX-DOS kit de ASCII (NO versionar) --------------------------
+# build/ en la raiz es el kit original de ASCII, contra el que se linkea la
+# DiskROM, igual que en el SDF-1. Es codigo de terceros: no se redistribuye.
+/build/
