@@ -91,7 +91,7 @@ static void bus_init(void)
     sm_config_set_out_pins(&c, PIN_D0, 8);
     sm_config_set_out_shift(&c, true, false, 32);
     pio_sm_init(pio, sm_est, off_est, &c);  // RX en modo GET, por .fifo txget
-    pio_sm_exec(pio, sm_est, pio_encode_set(pio_y, 1));
+    pio_sm_exec(pio, sm_est, pio_encode_set(pio_y, 2));
 
     pio_enable_sm_mask_in_sync(pio, (1u << sm_bus) | (1u << sm_est));
 

@@ -7,6 +7,11 @@
 ; del IN; si el dato no esta, el MSX lee FFh y el registro de estado es lo
 ; que le avisa que no tenia que leer todavia.
 ;
+; Filtro de pulsos: el '138 puede dar pulsos de pocos ns en /IOSEL (por
+; ejemplo, al terminar el acuse de una interrupcion, si M1 sube antes que
+; /IORQ). Las dos SM esperan ~100 ns despues de la bajada y descartan el
+; acceso si /IOSEL ya subio. Un ciclo de I/O real lo mantiene bajo >500 ns.
+;
 ; Pines (ver pins.h): D0-D7 = GP0-7, /IOSEL = GP8, A0 = GP9, /RD = GP10.
 ; Base de IN y de OUT en GP0, 8 pines de OUT, desplazamiento a la derecha.
 
@@ -30,7 +35,8 @@
     jmp escribir        ; 3: OUT (01h)  comando
 public entrada:
 .wrap_target
-    wait 0 gpio 8       ; /IOSEL bajo: acceso a 00h/01h
+    wait 0 gpio 8 [15]  ; /IOSEL bajo: acceso a 00h/01h... o un pulso espurio
+    jmp pin fin         ; ~120 ns despues ya subio: era un pulso, no un ciclo
     mov osr, pins
     out null, 9         ; descarta D0-D7 y /IOSEL
     out pc, 2           ; salta segun A0 + 2 * /RD
@@ -60,16 +66,16 @@ fin:
 ;
 ; El RX FIFO de esta SM esta en modo GET (PIO_FIFO_JOIN_TXGET): el nucleo
 ; escribe el estado en rxf_putget[sm][0] cuando quiere, y la SM lo lee sin
-; consumirlo. Y = 1, cargado desde el nucleo antes de arrancar.
+; consumirlo. Y = 2, cargado desde el nucleo antes de arrancar.
 ; ---------------------------------------------------------------------------
 .program sdf_estado
 .fifo txget
 .wrap_target
-    wait 0 gpio 8
+    wait 0 gpio 8 [15]  ; mismo filtro de pulsos que sdf_bus
     mov osr, pins
-    out null, 9
-    out x, 2            ; A0 + 2 * /RD
-    jmp x!=y fin_est    ; solo IN (01h)
+    out null, 8
+    out x, 3            ; /IOSEL + 2 * A0 + 4 * /RD
+    jmp x!=y fin_est    ; solo IN (01h) con /IOSEL todavia bajo (Y = 2)
     mov osr, rxfifo[0]
     out pins, 8
     mov pindirs, ~null
