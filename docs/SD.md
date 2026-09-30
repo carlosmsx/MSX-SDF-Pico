@@ -22,7 +22,7 @@ encendido: el firmware reintenta cada medio segundo hasta que contesta.
 |---|---|
 | `CALL SDFTEST` | Versión del firmware y estado de la SD |
 | `CALL SDFFILES` | Lista las imágenes `.DSK` de la raíz |
-| `CALL SDFMOUNT(drive, "NOMBRE.DSK")` | Monta una imagen; `drive` es 0 para A: y 1 para B: |
+| `CALL SDFMOUNT(drive, "NOMBRE")` | Monta una imagen; `drive` es 0 para A: y 1 para B:. Sin extensión se agrega `.DSK` |
 | `CALL SDFUMOUNT(drive)` | Deja el drive sin imagen |
 | `CALL SDFNEW("NOMBRE"[, tamaño])` | Crea una imagen vacía y formateada, de 720 o 360 KB; no la monta |
 | `CALL SDFDRIVES(n)` | Cantidad de drives que ve el DOS, 1 o 2, desde el próximo arranque |

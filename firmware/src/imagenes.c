@@ -280,6 +280,12 @@ uint8_t img_montar(uint8_t d, const char *n, uint8_t largo)
         return ERR_BAD_FILE_NAME;
     memcpy(nuevo, n, largo);
     nuevo[largo] = 0;
+    // Sin extension se busca el .DSK, igual que CALL SDFNEW la agrega.
+    if (!strchr(nuevo, '.')) {
+        if (largo + 4 >= NOMBRE_LEN)
+            return ERR_BAD_FILE_NAME;
+        strcat(nuevo, ".DSK");
+    }
     uint8_t err = verificar(nuevo);
     if (err)
         return err;
