@@ -6,6 +6,12 @@
 // Un solo escritor: con_printf se llama solo desde el nucleo 1.
 
 #pragma once
+#include <stdbool.h>
 
 void con_printf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void consola_tarea(void);
+
+// Entrada (nucleo 0): arma una linea sin bloquear. Devuelve la linea
+// terminada, sin el fin de linea, o NULL si todavia no hay. Con oculta el eco
+// es '*' (claves).
+const char *consola_linea(bool oculta);

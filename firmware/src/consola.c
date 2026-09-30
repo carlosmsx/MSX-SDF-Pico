@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/sync.h"
 #include "consola.h"
@@ -44,5 +45,41 @@ void consola_tarea(void)
     if (perdidos) {
         printf("[consola: %lu bytes perdidos]\n", (unsigned long)perdidos);
         perdidos = 0;
+    }
+}
+
+const char *consola_linea(bool oculta)
+{
+    static char linea[128];
+    static int n;
+    static bool listo;
+    static char previo;
+
+    if (listo) {                // la anterior ya se entrego: se borra (claves)
+        listo = false;
+        memset(linea, 0, sizeof linea);
+        n = 0;
+    }
+    for (;;) {
+        int c = getchar_timeout_us(0);
+        if (c == PICO_ERROR_TIMEOUT)
+            return NULL;
+        char p = previo;
+        previo = (char)c;
+        if (c == '\n' && p == '\r')
+            continue;           // CR LF: un solo fin de linea
+        if (c == '\r' || c == '\n') {
+            putchar('\n');
+            linea[n] = 0;
+            listo = true;
+            return linea;
+        }
+        if ((c == 8 || c == 127) && n > 0) {
+            n--;
+            fputs("\b \b", stdout);
+        } else if (c >= 32 && c < 127 && n < (int)sizeof linea - 1) {
+            linea[n++] = (char)c;
+            putchar(oculta ? '*' : c);
+        }
     }
 }

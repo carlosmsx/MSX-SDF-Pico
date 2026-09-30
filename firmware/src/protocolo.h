@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PROTOCOL_VERSION  8   // el 7 del SDF-1, con registro de estado
-#define FW_VERSION        "SDF-Pico 0.3"
+#define FW_VERSION        "SDF-Pico 0.4"
 
 // Registro de estado, IN (01h). Ver docs/PROTOCOLO.md.
 #define EST_OCUPADO       0x80  // el firmware prepara la respuesta: no leer 00h
