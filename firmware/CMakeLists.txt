@@ -19,6 +19,7 @@ set(FUENTES
     src/sd_spi.c
     src/consola.c
     src/wifi.c
+    src/menu_wifi.c
     lib/fatfs/ff.c
 )
 # src/disco.c (el disco en la flash de la Pico, docs/DISCO-FLASH.md) quedo

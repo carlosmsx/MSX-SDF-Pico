@@ -1,8 +1,8 @@
 # Wi-Fi
 
-> **Estado:** firmware 0.4. Conexión, búsqueda de redes y credenciales
-> guardadas, manejadas desde la consola USB. Compila; sin probar en la placa.
-> Falta el menú desde el MSX (`CALL WIFI`).
+> **Estado:** la conexión desde la consola USB (firmware 0.4) está probada.
+> El menú desde el MSX, `CALL WIFI` (firmware 0.5 y DiskROM nueva), compila y
+> no está probado.
 
 La Pico 2 W trae un CYW43439. El firmware lo usa en modo estación: se conecta
 a una red existente y obtiene la dirección por DHCP.
@@ -56,6 +56,41 @@ flash es el firmware del CYW43, que ya se leyó.
 - Si la conexión falla o se pierde, reintenta con la red guardada cada 30 s.
 - Un intento que no termina en 30 s cuenta como fallo.
 - Si falla una red nueva, no se guarda y se vuelve a la anterior.
+
+## `CALL WIFI`
+
+Menú en la pantalla del MSX, desde BASIC:
+
+```
+SDF-Pico: red Wi-Fi
+Conectado a MiCasa
+IP 192.168.1.47
+
+> MiCasa                         -52*
+  Vecino                         -71
+  Invitados                      -80
+
+  Buscar redes
+  Olvidar la red guardada
+  Salir
+
+Cursor y RETURN elige, ESC sale
+```
+
+- Al entrar busca redes. La lista va ordenada por señal y el `*` marca la
+  red guardada.
+- Al elegir una red pide la clave, que se ve como asteriscos. Una red
+  abierta conecta directamente.
+- Mientras conecta muestra el avance. `ESC` vuelve al menú y la conexión
+  sigue.
+- Si conecta, la red queda guardada. Si no, muestra el motivo (clave
+  incorrecta, red no encontrada) y sigue la anterior.
+- `ESC` en el menú, o `CTRL+STOP` en cualquier momento, sale y limpia la
+  pantalla.
+
+El menú lo arma el firmware y la ROM solo lo muestra (ver `CMD_WIFIMENU` en
+`PROTOCOLO.md`). Cambiar el menú es cambiar el firmware, sin regrabar la
+EEPROM.
 
 ## Consola USB
 

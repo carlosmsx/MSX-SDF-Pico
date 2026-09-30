@@ -123,6 +123,7 @@ P2_FORMAT	EQU		8000H
 P2_NEWDSK	EQU		8003H
 P2_SDFFILES	EQU		8006H
 P2_SDFTEST	EQU		8009H
+P2_WIFI		EQU		800CH
 
 ;Primitivas del protocolo. Sin /WAIT: el firmware atiende cada acceso en
 ;~100 ns desde la PIO, asi que las escrituras no llevan retardo. Lo que el Z80
@@ -740,6 +741,9 @@ CMDS:
 	;reloj
 	DEFB	"RTC",0
 	DEFW	_RTC
+	;red
+	DEFB	"WIFI",0
+	DEFW	_WIFI
 	DEFB	0               ; No more commands
 
 ; CALL SDFDEBUG
@@ -1037,6 +1041,15 @@ _SDFNEW:
 
 _SDFTEST:
 	LD		IX,P2_SDFTEST
+	JP		CALLP2
+
+; CALL WIFI
+;
+; Menu de la red Wi-Fi. No tiene argumentos: lo hace entero WIFI en PAGE2.MAC,
+; que es una terminal (el menu lo arma el firmware).
+
+_WIFI:
+	LD		IX,P2_WIFI
 	JP		CALLP2
 	
 ; MTOFF

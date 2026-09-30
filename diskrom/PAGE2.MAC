@@ -19,9 +19,12 @@
 
 	INCLUDE	PROTOCOL.INC
 
+CHSNS		EQU		0009CH
+CHGET		EQU		0009FH
 CHPUT		EQU		000A2H
 BREAKX		EQU		000B7H
 LINLEN		EQU		0F3B0H
+CRTCNT		EQU		0F3B1H
 CSRX		EQU		0F3DDH
 
 ;Errores de BASIC que devuelve NEWDSK
@@ -47,6 +50,7 @@ BPB_LEN		EQU		13H
 	JP		NEWDSK			;8003h
 	JP		SDFFILES		;8006h
 	JP		SDFTEST			;8009h
+	JP		WIFI			;800Ch
 
 ;----I/O con el firmware: las mismas que en la pagina 1----
 ;Ver los comentarios de la pagina 1: sin retardo al escribir, ~60 us despues
@@ -410,6 +414,68 @@ S_PROTOCOL:
 	DB		13,10,"Protocolo ",0
 S_MISMATCH:
 	DB		"Distinto al de la ROM!",13,10,0
+
+; WIFI
+;
+; CALL WIFI: menu de la red Wi-Fi. Lo arma entero el firmware: esta rutina es
+; una terminal. Manda cada tecla con el ancho y el alto de la pantalla, y
+; muestra lo que vuelve: un byte (0 = sigue, 1 = fin) y texto ASCIIZ con
+; codigos de control del CHPUT. Sin tecla consulta cada tres interrupciones,
+; para que se vean los cambios (la busqueda de redes, la conexion).
+; CTRL+STOP sale siempre. Conserva HL, el puntero de BASIC.
+
+WIFI:
+	PUSH	HL
+	LD		A,WIFI_EMPEZAR
+.WIFISEND:
+	LD		C,A				;tecla
+	LD		A,CMD_WIFIMENU
+	CALL	WriteCommand
+	LD		A,C
+	CALL	WriteByte
+	LD		A,(LINLEN)
+	CALL	WriteByte
+	LD		A,(CRTCNT)
+	CALL	WriteByte
+	CALL	ReadByte		;0 sigue, 1 fin
+	LD		C,A
+	CP		2
+	JR		NC,.WIFIFAIL	;0FFh: bus flotando, o no contesto a tiempo
+.WIFICHAR:
+	CALL	ReadByte
+	OR		A
+	JR		Z,.WIFISHOWN
+	CP		0FFH
+	JR		Z,.WIFIFAIL		;se corto a mitad del texto
+	CALL	CHPUT
+	JR		.WIFICHAR
+.WIFISHOWN:
+	DEC		C
+	JR		Z,.WIFIEND		;fin: el firmware ya limpio la pantalla
+.WIFIWAIT:
+	CALL	BREAKX
+	LD		A,WIFI_CORTAR
+	JR		C,.WIFISEND		;CTRL+STOP: el firmware cierra el menu
+	CALL	CHSNS
+	JR		NZ,.WIFIKEY
+	LD		B,3
+.WIFIHALT:
+	HALT
+	DJNZ	.WIFIHALT
+	LD		A,WIFI_NADA
+	JR		.WIFISEND
+.WIFIKEY:
+	CALL	CHGET
+	JR		.WIFISEND
+.WIFIFAIL:
+	LD		HL,S_WIFIFAIL
+	CALL	PRINTSTR
+.WIFIEND:
+	POP		HL
+	RET
+
+S_WIFIFAIL:
+	DB		27,"y5",13,10,"El firmware no responde",13,10,0
 
 ; Imprime el ASCIIZ apuntado por HL
 PRINTSTR:

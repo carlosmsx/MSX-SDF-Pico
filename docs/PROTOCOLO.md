@@ -125,6 +125,35 @@ estados T por byte, y calcular el checksum costaba otros 21. Sirvió para
 validar el bus (miles de sectores sin un error). El firmware lo sigue
 atendiendo, así que una ROM de diagnóstico puede volver a usarlo.
 
+## Menú de Wi-Fi (`CMD_WIFIMENU`)
+
+Comando nuevo del SDF-Pico (0B0h). Se agrega a los del SDF-1 sin cambiar
+ninguno, así que el protocolo sigue siendo el 8. `CALL WIFI` es una terminal:
+el menú entero lo arma el firmware (`firmware/src/menu_wifi.c`).
+
+```
+OUT (01h), CMD_WIFIMENU
+OUT (00h), tecla        la del CHGET, o 0 = ninguna, FEh = CTRL+STOP, FFh = empezar
+OUT (00h), LINLEN       ancho de la pantalla
+OUT (00h), CRTCNT       filas de la pantalla
+IN  (00h)               0 = sigue, 1 = fin
+IN  (00h) ... 0         texto para el CHPUT, ASCIIZ
+```
+
+El texto usa los códigos de control del `CHPUT`: `CLS` (0Ch), `ESC Y` para
+ubicar el cursor, `ESC K` para borrar el resto de la fila y `ESC x5`/`ESC y5`
+para ocultar y mostrar el cursor. El firmware recuerda lo que tiene la
+pantalla y manda solo las filas que cambiaron. No escribe en la última
+columna ni en la última fila, así que la pantalla nunca se desplaza.
+
+Sin tecla, la ROM consulta cada tres interrupciones (unos 50 ms). Así se ven
+los cambios que no dependen del teclado: el fin de la búsqueda de redes y el
+avance de la conexión.
+
+La respuesta la arma el núcleo 0, donde está el Wi-Fi. El núcleo 1 levanta
+`OCUPADO` como en cualquier comando, le pasa el pedido y lo baja cuando el
+núcleo 0 contesta, normalmente en menos de un milisegundo.
+
 ## Condición de carrera al enviar un comando
 
 `OCUPADO` tiene que estar en 1 antes de que el Z80 pueda consultar el estado

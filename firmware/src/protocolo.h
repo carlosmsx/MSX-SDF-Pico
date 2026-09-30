@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PROTOCOL_VERSION  8   // el 7 del SDF-1, con registro de estado
-#define FW_VERSION        "SDF-Pico 0.4"
+#define FW_VERSION        "SDF-Pico 0.5"
 
 // Registro de estado, IN (01h). Ver docs/PROTOCOLO.md.
 #define EST_OCUPADO       0x80  // el firmware prepara la respuesta: no leer 00h
@@ -32,6 +32,9 @@
 #define CMD_RTCGET        0xA1
 #define CMD_RTCSETDA      0xA2
 #define CMD_RTCSETTI      0xA3
+
+// 0xBx: red
+#define CMD_WIFIMENU      0xB0  // tecla, ancho, filas; contesta fin y texto (menu_wifi.h)
 
 // 0xDx: diagnostico
 #define CMD_DEBUG         0xD0

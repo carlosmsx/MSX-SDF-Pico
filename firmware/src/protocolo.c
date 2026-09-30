@@ -19,6 +19,7 @@
 #include "bus.h"
 #include "consola.h"
 #include "imagenes.h"
+#include "menu_wifi.h"
 #include "protocolo.h"
 #include "sd_spi.h"
 
@@ -44,6 +45,7 @@ static params_t params_de(uint8_t cmd)
     case CMD_DEVOPEN:                   return (params_t){P_NOMBRE, 2};
     case CMD_DEVCLOSE:                  return (params_t){P_FIJO, 2};
     case CMD_DEVOUT:                    return (params_t){P_FIJO, 1};
+    case CMD_WIFIMENU:                  return (params_t){P_FIJO, 3};
     default:                            return (params_t){P_FIJO, 0};
     }
 }
@@ -74,6 +76,9 @@ static uint8_t esc_drive;
 static uint32_t esc_sector, esc_total, esc_n;
 
 static uint8_t contador[256];
+
+// CMD_WIFIMENU: la respuesta la arma el nucleo 0
+static bool esperando_menu;
 
 static struct {
     uint32_t lecturas, escrituras, sectores_leidos, sectores_escritos;
@@ -268,6 +273,12 @@ static void ejecutar(void)
         n = informe((char *)resp, sizeof resp);
         break;
 
+    case CMD_WIFIMENU:
+        // OCUPADO hasta que el nucleo 0 conteste (esperar_menu)
+        menu_pedir(par[0], par[1], par[2]);
+        esperando_menu = true;
+        return;
+
     case CMD_SDFFILES:
         bus_tx_enviar(io_buf, img_listar(io_buf, sizeof io_buf));
         break;
@@ -310,6 +321,7 @@ static void comando(uint8_t c)
             con_printf("WRITE cortado: faltaban %lu bytes\n",
                        (unsigned long)(esc_total - esc_n));
         lec_quedan = 0;
+        esperando_menu = false;
     }
     cmd = c;
     npar = 0;
@@ -370,6 +382,19 @@ static void iniciar_sd(bool siempre)
     }
 }
 
+static void esperar_menu(void)
+{
+    const uint8_t *datos;
+    if (!esperando_menu)
+        return;
+    int n = menu_respuesta(&datos);
+    if (n < 0)
+        return;
+    esperando_menu = false;
+    bus_tx_enviar(datos, n);
+    soltar();
+}
+
 static void tarea_sd(void)
 {
     static absolute_time_t prox;
@@ -400,6 +425,7 @@ void protocolo_core1(void)
         con_printf("bus vivo: atendiendo 00h/01h\n");
         etapa = E_LIBRE;
         error_st = false;
+        esperando_menu = false;
 
         // La SD, con el estado todavia en OCUPADO: la ROM espera, y asi su
         // primer DRIVES ya recibe lo que dice la configuracion. Antes, un
@@ -417,6 +443,7 @@ void protocolo_core1(void)
                 else
                     dato(b);
             }
+            esperar_menu();
             if (libre && !bus_rx_hay())
                 publicar(EST_FIJO | (error_st ? EST_ERROR : 0));
             tarea_sd();

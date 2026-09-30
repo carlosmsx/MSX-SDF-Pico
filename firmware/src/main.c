@@ -4,8 +4,9 @@
 // interrupciones: tiene que ver cada comando en menos de un microsegundo para
 // levantar OCUPADO antes de que el Z80 consulte el estado. Tambien maneja la
 // SD: mientras tanto el estado queda en OCUPADO.
-// Nucleo 0: la consola USB, el Wi-Fi (wifi.c) y el diagnostico, si esta
-// compilado. El Wi-Fi arranca despues del nucleo 1: el bus no lo espera.
+// Nucleo 0: la consola USB, el Wi-Fi (wifi.c), su menu (menu_wifi.c) y el
+// diagnostico, si esta compilado. El Wi-Fi arranca despues del nucleo 1: el
+// bus no lo espera.
 //
 // Todo el programa corre desde la RAM (copy_to_ram), para que el nucleo 1 no
 // dependa de la cache de la flash.
@@ -17,6 +18,7 @@
 #include "bus.h"
 #include "consola.h"
 #include "protocolo.h"
+#include "menu_wifi.h"
 #include "wifi.h"
 
 static void comando(const char *linea)
@@ -46,6 +48,7 @@ int main(void)
         consola_tarea();
         bus_diagnostico();
         wifi_tarea();
+        menu_tarea();
         const char *linea = consola_linea(wifi_pide_clave());
         if (linea)
             comando(linea);

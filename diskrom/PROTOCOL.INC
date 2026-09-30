@@ -3,7 +3,7 @@
 ;que coincidir con defs.h del firmware.
 ;
 ;Comandos agrupados por funcion, un nibble alto por grupo:
-;  09xH dispositivos de BASIC, 0AxH reloj del kernel, 0DxH diagnostico,
+;  09xH dispositivos de BASIC, 0AxH reloj del kernel, 0BxH red, 0DxH diagnostico,
 ;  0ExH SD e imagenes DSK, 0FxH driver de disco de MSX-DOS
 
 ;Version del protocolo con el firmware: tiene que coincidir con
@@ -29,6 +29,14 @@ CMD_RTCCHK	EQU		0A0H	;sin datos, contesta 1 byte (0FFH=hay reloj, 0=no)
 CMD_RTCGET	EQU		0A1H	;contesta 7 bytes: anio-1980,mes,dia,hora,min,seg,diasem
 CMD_RTCSETDA	EQU	0A2H	;recibe 3 bytes: anio-1980,mes,dia
 CMD_RTCSETTI	EQU	0A3H	;recibe 3 bytes: hora,min,seg
+;0BxH: red. El menu de CALL WIFI lo arma el firmware (menu_wifi.c): la ROM
+;es una terminal. Manda la tecla del CHGET (o una de las de abajo), LINLEN y
+;CRTCNT, y muestra lo que vuelve: un byte (0 sigue, 1 fin) y texto ASCIIZ con
+;codigos de control del CHPUT (CLS, ESC Y, ESC K, ESC x5/y5).
+CMD_WIFIMENU	EQU	0B0H
+WIFI_NADA	EQU		0		;sin tecla: consulta si cambio algo
+WIFI_CORTAR	EQU		0FEH	;CTRL+STOP
+WIFI_EMPEZAR	EQU	0FFH
 ;0DxH: diagnostico
 CMD_DEBUG	EQU		0D0H
 CMD_SDFTEST	EQU		0D1H
