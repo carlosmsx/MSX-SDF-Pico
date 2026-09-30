@@ -32,13 +32,9 @@ lecturas.
 | 00h | `OUT 0,n` | Dato: en modo eco, queda para la lectura siguiente |
 | 00h | `INP(0)` | El siguiente byte del FIFO, o FFh si no hay ninguno |
 
-Registro de estado:
-
-| Bit | Significado |
-|---|---|
-| 6 | Siempre 1: el firmware está corriendo |
-| 3 | DMA en curso |
-| 0-2 | Bytes esperando en el FIFO de lectura (0 a 4) |
+Registro de estado: `40h` con el firmware listo, y el bit 7 (`OCUPADO`) en 1
+mientras prepara una respuesta (ver `PROTOCOLO.md`). Con la Pico sin atender
+el bus se lee `FFh`.
 
 Comandos:
 
@@ -62,11 +58,12 @@ Resultado esperado:
 | Línea | Muestra | Qué comprueba |
 |---|---|---|
 | 10 | `40` | Lectura del estado. `FF` indica que la Pico no contesta |
-| 20 | `41   65` | Escritura de comando y de dato, y lectura del FIFO |
+| 20 | `40   65` | Escritura de comando y de dato, y lectura del FIFO |
 | 30 | `0 1 2 3 4 5 6 7 8 9` | El DMA repone el FIFO entre lectura y lectura |
-| 40 | `4C` | Quedan 4 bytes en el FIFO y el DMA sigue en curso |
+| 40 | `40` | El estado sigue listo |
 
-La consola debe mostrar `OUT 01h = 01`, `OUT 00h = 41` y `OUT 01h = 02`.
+Con el firmware normal la consola no muestra cada acceso; para verlos, usar
+`sdf_pico_diag.uf2`.
 
 ## Prueba de las ocho líneas de datos
 
@@ -74,9 +71,7 @@ La consola debe mostrar `OUT 01h = 01`, `OUT 00h = 41` y `OUT 01h = 02`.
 50 OUT 1,1: FOR I=0 TO 7: OUT 0,2^I: PRINT INP(0);: NEXT: PRINT
 ```
 
-Debe mostrar `1 2 4 8 16 32 64 128`, y la consola `OUT 00h = 01`, `02`, `04`,
-..., `80`. La consola comprueba cada línea en el sentido MSX a Pico, y la
-pantalla, ida y vuelta.
+Debe mostrar `1 2 4 8 16 32 64 128`: cada línea de datos, ida y vuelta.
 
 ## Si algo falla
 

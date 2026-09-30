@@ -1,7 +1,8 @@
 # Protocolo entre la DiskROM y el firmware
 
-> **Borrador.** Describe el diseño acordado; todavía no está implementado ni
-> probado.
+> **Estado:** el lado del firmware está implementado (`firmware/src/protocolo.c`),
+> con el disco en la flash de la Pico (`DISCO-FLASH.md`). La DiskROM que espera
+> el estado todavía no existe.
 
 ## Punto de partida
 
@@ -80,13 +81,23 @@ por cada sector:
     si ERROR: salir con error
 ```
 
+## `CMD_DEBUG`, la excepción
+
+La ROM manda `CMD_DEBUG` y el checksum XOR de cada sector en medio de un
+`CMD_READ`. Es el único comando que no corta la transacción en curso: no
+levanta `OCUPADO` ni descarta los sectores que quedan por leer. El firmware
+compara el checksum con el del sector enviado y lleva la cuenta, que muestra
+`CALL SDFDEBUG`.
+
 ## Condición de carrera al enviar un comando
 
 `OCUPADO` tiene que estar en 1 antes de que el Z80 pueda consultar el estado
 después de un comando. Entre un `OUT (01h),A` y el `IN A,(01h)` siguiente pasan
 como mínimo unos 3 µs. El firmware atiende el bus desde un núcleo dedicado, en
 un bucle cerrado, y pone `OCUPADO` en 1 en cuanto recibe el byte de comando,
-antes que cualquier otra cosa.
+antes que cualquier otra cosa. El núcleo 1 no tiene interrupciones y el
+programa corre desde la RAM, así que la demora es del orden de un
+microsegundo.
 
 ## Velocidad esperada
 

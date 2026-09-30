@@ -8,8 +8,9 @@ búfer de datos (`'245`) y la EEPROM con la DiskROM. La Pico atiende el bus del
 MSX con sus bloques PIO y alimenta las transferencias por DMA, lo que permite
 responder a cada acceso sin detener al Z80.
 
-> **Estado:** en desarrollo. Existe un primer firmware para probar el bus desde
-> BASIC; todavía no hay acceso a la SD ni DiskROM propia.
+> **Estado:** en desarrollo. El bus funciona sin `/WAIT` en una Daewoo DPC-200,
+> y el firmware atiende el protocolo del SDF-1 con un disco en la flash de la
+> Pico (`docs/DISCO-FLASH.md`). Faltan la DiskROM propia y la tarjeta SD.
 
 ## Diferencias con el SDF-1
 
@@ -35,6 +36,7 @@ DiskROM espera antes de leer.
 | `hardware/` | Modificaciones a la placa del SDF-1 y cableado de la Pico |
 | `firmware/` | Firmware de la Pico, en C con el pico-sdk |
 | `docs/` | Protocolo entre la DiskROM y el firmware, y procedimientos de prueba |
+| `tools/` | `dsk2uf2.py`: carga una imagen `.DSK` en la flash de la Pico |
 
 ## Compilación del firmware
 
