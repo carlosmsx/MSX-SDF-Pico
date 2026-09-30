@@ -54,6 +54,9 @@ def imagen_vacia(kb):
         f["caras"],
         0,              # sectores ocultos
     )
+    # El DOS llama a C01Eh (el byte 1Eh del sector) si el sector empieza con
+    # EBh: tiene que haber codigo. Un RET vuelve y deja arrancar la Disk BASIC.
+    arranque[0x1E] = 0xC9
     img[0:512] = arranque
     for copia in range(2):
         inicio = 512 * (1 + copia * f["por_fat"])
