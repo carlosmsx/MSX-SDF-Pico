@@ -18,6 +18,7 @@
 // configuracion. Hay que reintentar mientras img_sd_ok() sea false.
 bool img_iniciar(void);
 bool img_sd_ok(void);
+void img_apagar(void);      // el MSX se apago: soltar la SD hasta que vuelva
 const char *img_sd_texto(void);     // para CALL SDFTEST: "ok", "no contesta"...
 
 uint8_t img_drives(void);           // 1 o 2, lo que contesta DRIVES

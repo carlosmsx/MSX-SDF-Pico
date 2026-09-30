@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ff.h"
+#include "consola.h"
 #include "sd_spi.h"
 #include "imagenes.h"
 #include "protocolo.h"
@@ -36,6 +37,7 @@ static void caida(void)
 static bool fallo_de_disco(FRESULT r)
 {
     if (r == FR_DISK_ERR || r == FR_NOT_READY || r == FR_INT_ERR) {
+        con_printf("SD: fallo de disco (FatFs %d), se reinicia\n", (int)r);
         caida();
         return true;
     }
@@ -150,6 +152,12 @@ bool img_iniciar(void)
         cambio[0] = cambio[1] = 1;  // puede ser otra tarjeta: que el DOS relea
     }
     return sd_ok;
+}
+
+void img_apagar(void)
+{
+    caida();
+    sd_apagar();
 }
 
 bool img_sd_ok(void)

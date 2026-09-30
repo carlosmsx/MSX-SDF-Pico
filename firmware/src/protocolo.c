@@ -364,18 +364,24 @@ void protocolo_core1(void)
     for (int i = 0; i < 256; i++)
         contador[i] = (uint8_t)i;
 
-    // Antes de atender el bus: mientras tanto el MSX lee FFh en el estado,
-    // que para la ROM es OCUPADO, y espera.
-    con_printf("SD: %s\n", img_iniciar() ? "ok" : img_sd_texto());
     st.desde = get_absolute_time();
 
     for (;;) {
+        // Con el MSX apagado el modulo SD no tiene alimentacion: los pines
+        // del SPI quedan sueltos hasta que vuelva.
+        img_apagar();
         publicado = 0;
         ocupado();
         bus_despertar();
         con_printf("bus vivo: atendiendo 00h/01h\n");
         etapa = E_LIBRE;
         error_st = false;
+
+        // La SD, con el estado todavia en OCUPADO: la ROM espera, y asi su
+        // primer DRIVES ya recibe lo que dice la configuracion. Antes, un
+        // momento para que el regulador del modulo y la tarjeta arranquen.
+        busy_wait_ms(250);
+        con_printf("SD: %s\n", img_iniciar() ? "ok" : img_sd_texto());
         soltar();
 
         while (!bus_vigilar()) {

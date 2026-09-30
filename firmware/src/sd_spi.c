@@ -30,6 +30,7 @@
 #define ACMD41  41      // SD_SEND_OP_COND
 
 static bool lista;
+static bool pines;          // los pines del SPI estan configurados
 static bool por_bloque;     // SDHC/SDXC: direcciones en bloques, no en bytes
 static int ultimo_error = SD_SIN_PROBAR;
 
@@ -139,9 +140,37 @@ int sd_error(void)
     return ultimo_error;
 }
 
+// El modulo se alimenta del MSX. Con el MSX apagado y la Pico encendida por
+// USB, las lineas del SPI en alto alimentan la tarjeta a medias por sus
+// entradas, y cuando vuelve la alimentacion no arranca limpia: queda colgada
+// hasta que se la saca. Con el bus muerto los pines quedan en alta impedancia.
+void sd_apagar(void)
+{
+    lista = false;
+    pines = false;
+    ultimo_error = SD_SIN_PROBAR;
+    spi_deinit(SD_SPI);
+    const uint p[] = {PIN_SD_CS, PIN_SD_SCK, PIN_SD_MOSI, PIN_SD_MISO};
+    for (int i = 0; i < 4; i++) {
+        gpio_init(p[i]);        // entrada
+        gpio_disable_pulls(p[i]);
+    }
+}
+
+// Una tarjeta que quedo a mitad de una lectura de varios bloques no atiende
+// comandos: sigue mandando datos. Se le dan pulsos para vaciar el bloque en
+// curso y un CMD12 para cortarla.
+static void destrabar(void)
+{
+    cs(true);
+    for (int i = 0; i < 600; i++)
+        xfer(0xFF);
+    comando(CMD12, 0);
+    soltar();
+}
+
 bool sd_iniciar(void)
 {
-    static bool pines;
     if (!pines) {
         pines = true;
         gpio_init(PIN_SD_CS);
@@ -162,6 +191,11 @@ bool sd_iniciar(void)
     uint8_t r = 0xFF;
     for (int i = 0; i < 5 && r != 1; i++)
         r = comando(CMD0, 0);
+    if (r != 1) {
+        destrabar();
+        for (int i = 0; i < 5 && r != 1; i++)
+            r = comando(CMD0, 0);
+    }
     if (r != 1) {
         soltar();
         ultimo_error = SD_NO_CONTESTA;  // sin tarjeta, modulo o cableado
