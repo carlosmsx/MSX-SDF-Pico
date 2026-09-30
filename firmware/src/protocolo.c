@@ -20,6 +20,7 @@
 #include "consola.h"
 #include "imagenes.h"
 #include "protocolo.h"
+#include "sd_spi.h"
 
 // ---- Parametros de cada comando ----
 
@@ -345,6 +346,30 @@ static void dato(uint8_t b)
 
 // Sin SD (o si dejo de contestar) se reintenta cada medio segundo, con el
 // estado en OCUPADO mientras dura el intento y solo si no hay nada a medias.
+// Un intento de iniciar la SD. A la consola va el resultado, con lo que
+// contesto la tarjeta y cuanto tardo, solo cuando cambia (sin tarjeta se
+// reintenta cada medio segundo).
+static void iniciar_sd(void)
+{
+    static char anterior[64];
+    char txt[64];
+    uint8_t cmd0;
+    bool miso;
+
+    absolute_time_t t0 = get_absolute_time();
+    bool ok = img_iniciar();
+    uint32_t ms = absolute_time_diff_us(t0, get_absolute_time()) / 1000;
+    sd_diag(&cmd0, &miso);
+    if (ok)
+        snprintf(txt, sizeof txt, "ok");
+    else
+        snprintf(txt, sizeof txt, "%s (CMD0=%02X MISO=%d)", img_sd_texto(), cmd0, miso);
+    if (strcmp(txt, anterior) != 0) {
+        con_printf("SD: %s, %lu ms\n", txt, (unsigned long)ms);
+        strcpy(anterior, txt);
+    }
+}
+
 static void tarea_sd(void)
 {
     static absolute_time_t prox;
@@ -353,8 +378,7 @@ static void tarea_sd(void)
     if (!time_reached(prox))
         return;
     ocupado();
-    if (img_iniciar())
-        con_printf("SD ok\n");
+    iniciar_sd();
     prox = make_timeout_time_ms(500);
     soltar();
 }
@@ -381,7 +405,7 @@ void protocolo_core1(void)
         // primer DRIVES ya recibe lo que dice la configuracion. Antes, un
         // momento para que el regulador del modulo y la tarjeta arranquen.
         busy_wait_ms(250);
-        con_printf("SD: %s\n", img_iniciar() ? "ok" : img_sd_texto());
+        iniciar_sd();
         soltar();
 
         while (!bus_vigilar()) {

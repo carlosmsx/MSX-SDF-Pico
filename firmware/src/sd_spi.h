@@ -15,3 +15,4 @@ enum {
 bool sd_iniciar(void);
 void sd_apagar(void);       // pines en alta impedancia: el modulo quedo sin alimentacion
 int sd_error(void);
+void sd_diag(uint8_t *cmd0, bool *miso);    // para la consola, si no inicia

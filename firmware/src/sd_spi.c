@@ -33,6 +33,8 @@ static bool lista;
 static bool pines;          // los pines del SPI estan configurados
 static bool por_bloque;     // SDHC/SDXC: direcciones en bloques, no en bytes
 static int ultimo_error = SD_SIN_PROBAR;
+static uint8_t diag_cmd0;       // lo que contesto el ultimo CMD0
+static bool diag_miso;          // MISO con la tarjeta sin elegir, antes de empezar
 
 static inline void cs(bool elegida)
 {
@@ -77,7 +79,13 @@ static bool elegir(void)
 // elegida, para leer lo que siga; el que llama suelta.
 static uint8_t comando(uint8_t c, uint32_t arg)
 {
-    if (c != CMD12) {
+    if (c == CMD0) {
+        // Sin esperar a que este lista: una tarjeta colgada puede tener MISO
+        // en bajo, y CMD0 es justamente lo que la saca de ahi.
+        soltar();
+        cs(true);
+        xfer(0xFF);
+    } else if (c != CMD12) {
         soltar();
         if (!elegir())
             return 0xFF;
@@ -140,6 +148,12 @@ int sd_error(void)
     return ultimo_error;
 }
 
+void sd_diag(uint8_t *cmd0, bool *miso)
+{
+    *cmd0 = diag_cmd0;
+    *miso = diag_miso;
+}
+
 // El modulo se alimenta del MSX. Con el MSX apagado y la Pico encendida por
 // USB, las lineas del SPI en alto alimentan la tarjeta a medias por sus
 // entradas, y cuando vuelve la alimentacion no arranca limpia: queda colgada
@@ -187,6 +201,7 @@ bool sd_iniciar(void)
     cs(false);
     for (int i = 0; i < 10; i++)    // 80 pulsos con la tarjeta sin elegir
         xfer(0xFF);
+    diag_miso = gpio_get(PIN_SD_MISO);
 
     uint8_t r = 0xFF;
     for (int i = 0; i < 5 && r != 1; i++)
@@ -196,6 +211,7 @@ bool sd_iniciar(void)
         for (int i = 0; i < 5 && r != 1; i++)
             r = comando(CMD0, 0);
     }
+    diag_cmd0 = r;
     if (r != 1) {
         soltar();
         ultimo_error = SD_NO_CONTESTA;  // sin tarjeta, modulo o cableado
