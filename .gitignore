@@ -20,3 +20,6 @@ desktop.ini
 out/
 # Nestor80 (N80, LK80): binarios de terceros, se bajan.
 tools/bin/
+
+# Discos generados con tools/dsk2uf2.py
+/*.uf2
