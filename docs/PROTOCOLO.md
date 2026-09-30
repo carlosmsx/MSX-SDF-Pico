@@ -1,8 +1,9 @@
 # Protocolo entre la DiskROM y el firmware
 
-> **Estado:** el lado del firmware está implementado (`firmware/src/protocolo.c`),
-> con el disco en la flash de la Pico (`DISCO-FLASH.md`). La DiskROM que espera
-> el estado todavía no existe.
+> **Estado:** implementado en los dos lados: la DiskROM (`diskrom/`) y el
+> firmware (`firmware/src/protocolo.c`), con el disco en la flash de la Pico
+> (`DISCO-FLASH.md`). Es el **protocolo 8**: el 7 del SDF-1 con el registro de
+> estado. `CALL SDFTEST` avisa si la ROM y el firmware no coinciden.
 
 ## Punto de partida
 
@@ -38,6 +39,21 @@ de sincronización.
 
 Los bits 6 y 5 fijos permiten distinguir la respuesta del firmware del bus al
 aire, que se lee como FFh.
+
+## Primitivas de la DiskROM
+
+| Rutina | Qué hace |
+|---|---|
+| `WriteByte` | `OUT (00h),A`, sin retardo: la PIO captura cada escritura en ~100 ns |
+| `WriteCommand` | `OUT (01h),A` y ~60 µs de espera, para que el firmware levante `OCUPADO` antes de cualquier consulta |
+| `WaitReady` | Consulta el estado hasta ver `OCUPADO` en 0, con un límite de ~2,6 s |
+| `ReadByte` | `WaitReady` y después `IN A,(00h)`; si se agota el tiempo devuelve `FFh`, como el bus al aire |
+| `ReadBlock` / `WriteBlock` | 256 bytes con `INI`/`OUTI`, sin espera por byte |
+
+`ReadByte` espera antes de cada byte, no solo del primero. Como el firmware
+baja `OCUPADO` recién con la respuesta completa encolada, la espera de los
+bytes siguientes es inmediata, y así ningún comando necesita saber cuál es
+el primer byte de su respuesta.
 
 ## Regla general
 

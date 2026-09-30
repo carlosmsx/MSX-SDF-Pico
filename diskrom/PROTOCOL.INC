@@ -8,7 +8,8 @@
 
 ;Version del protocolo con el firmware: tiene que coincidir con
 ;PROTOCOL_VERSION en defs.h. La compara CALL SDFTEST.
-PROTOCOL	EQU		7
+;SDF-Pico: 8 = el 7 del SDF-1, sin /WAIT: la ROM espera OCUPADO en el estado.
+PROTOCOL	EQU		8
 
 ;09xH: tubo de dispositivos de BASIC (OPEN "RTC:"...). La ROM no sabe que
 ;dispositivos hay: pregunta el nombre y despues pasa bytes. Un dispositivo
@@ -72,6 +73,10 @@ DEV_BUSY	EQU		0FEH
 ;Error de BASIC que devuelve la ROM si el firmware contesta cualquier cosa con
 ;el bit 7 puesto (bus flotando en 0FFH, firmware viejo).
 ERR_DEVICE_IO	EQU	19
+
+;Registro de estado, IN (PORT_CMD): bit 7 OCUPADO, bit 6 siempre 1, bit 5
+;siempre 0 (0FFh es el bus al aire), bit 1 CAMBIO, bit 0 ERROR.
+ST_BUSY		EQU		80H
 
 ;----I/O Ports----
 PORT_CMD	EQU		1

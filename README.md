@@ -9,8 +9,9 @@ MSX con sus bloques PIO y alimenta las transferencias por DMA, lo que permite
 responder a cada acceso sin detener al Z80.
 
 > **Estado:** en desarrollo. El bus funciona sin `/WAIT` en una Daewoo DPC-200,
-> y el firmware atiende el protocolo del SDF-1 con un disco en la flash de la
-> Pico (`docs/DISCO-FLASH.md`). Faltan la DiskROM propia y la tarjeta SD.
+> y Disk BASIC arranca sobre un disco en la flash de la Pico
+> (`docs/DISCO-FLASH.md`). La DiskROM propia, que consulta el registro de
+> estado, está compilada y sin probar. Falta la tarjeta SD.
 
 ## Diferencias con el SDF-1
 
@@ -33,6 +34,7 @@ DiskROM espera antes de leer.
 
 | Carpeta | Contenido |
 |---|---|
+| `diskrom/` | DiskROM (Z80), derivada de la del SDF-1 |
 | `hardware/` | Modificaciones a la placa del SDF-1 y cableado de la Pico |
 | `firmware/` | Firmware de la Pico, en C con el pico-sdk |
 | `docs/` | Protocolo entre la DiskROM y el firmware, y procedimientos de prueba |
@@ -50,6 +52,20 @@ cd firmware
 
 El resultado es `firmware/build/sdf_pico.uf2`, que se copia a la Pico
 conectada en modo BOOTSEL.
+
+## Compilación de la DiskROM
+
+La DiskROM se ensambla con [Nestor80](https://github.com/Konamiman/Nestor80)
+(N80 y LK80, en `tools/bin/`) y se linkea contra el MSX-DOS kit de ASCII, que
+va en `build/`. Ninguno de los dos se incluye en el repositorio: el kit es
+código de terceros. Con ambos en su lugar:
+
+```
+make rom
+```
+
+El resultado es `out/sdfpico.rom`, la imagen de 64 KB para la W27C512. Por
+contener el kernel de ASCII, esa imagen tampoco se publica.
 
 ## Licencia
 

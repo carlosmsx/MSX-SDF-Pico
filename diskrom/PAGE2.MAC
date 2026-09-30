@@ -49,22 +49,49 @@ BPB_LEN		EQU		13H
 	JP		SDFTEST			;8009h
 
 ;----I/O con el firmware: las mismas que en la pagina 1----
+;Ver los comentarios de la pagina 1: sin retardo al escribir, ~60 us despues
+;del comando, y ReadByte espera OCUPADO en 0 (0FFh si se agota el tiempo).
+;FORMAT manda los sectores de sistema de corrido, sin esperar entre sector y
+;sector: el firmware los recibe en un anillo mientras graba.
 WriteByte:
 	OUT		(PORT_DATA),A
-	EX 		(SP),HL		;19 cycles
-	EX		(SP),HL		;19 cycles
 	RET
 
 WriteCommand:
 	OUT		(PORT_CMD),A
-	EX		(SP),HL
-	EX		(SP),HL
+	PUSH	BC
+	LD		B,16
+.WCDLY:
+	DJNZ	.WCDLY
+	POP		BC
 	RET
 
 ReadByte:
+	CALL	WaitReady
+	LD		A,0FFH
+	RET		C
 	IN		A,(PORT_DATA)
-	EX		(SP),HL
-	EX		(SP),HL
+	RET
+
+WaitReady:
+	PUSH	BC
+	PUSH	DE
+	LD		DE,0
+.WRLOOP:
+	LD		B,4
+.WRPOLL:
+	IN		A,(PORT_CMD)
+	RLCA
+	JR		NC,.WREND
+	DJNZ	.WRPOLL
+	DEC		DE
+	LD		A,D
+	OR		E
+	JR		NZ,.WRLOOP
+	SCF
+.WREND:
+	POP		DE
+	POP		BC
 	RET
 
 ; Manda BC bytes desde HL. Deja HL despues del ultimo.

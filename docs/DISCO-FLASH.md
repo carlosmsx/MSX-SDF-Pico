@@ -39,7 +39,7 @@ conectarla.
 
 ## Probar desde BASIC
 
-Con la EEPROM del SDF-1 puesta y el disco cargado:
+Con la EEPROM grabada con `out/sdfpico.rom` y el disco cargado:
 
 ```basic
 FILES
@@ -50,7 +50,7 @@ CALL SDFTEST
 CALL SDFDEBUG
 ```
 
-`CALL SDFTEST` muestra la versión del firmware (`SDF-Pico 0.1`, protocolo 7).
+`CALL SDFTEST` muestra la versión del firmware (`SDF-Pico 0.2`, protocolo 8).
 `CALL SDFDEBUG` muestra la cantidad de lecturas y escrituras, en comandos y
 en sectores, y cuántos checksums de sector coincidieron y cuántos no. La ROM
 manda el checksum de cada sector leído; un checksum que no coincide indica
@@ -60,7 +60,8 @@ un problema en el bus, y además se informa por la consola USB.
 
 La DiskROM del SDF-1 no consulta el registro de estado: lee la respuesta
 unos 15 µs después de enviar el último parámetro, confiando en el `/WAIT` que
-ya no existe. Con el disco en la flash la respuesta está lista en pocos
-microsegundos, así que en principio funciona. La DiskROM propia del SDF-Pico,
-que espera `OCUPADO` en 0 antes de cada bloque, es la que va a permitir usar
-la SD, cuyos tiempos son mucho más largos.
+ya no existe. Con el disco en la flash las lecturas funcionan, porque la
+respuesta está lista en pocos microsegundos, pero las escrituras no: grabar un
+bloque de flash lleva decenas de milisegundos, la ROM lee el estado del
+`WRITE` siguiente antes de tiempo y el DOS termina en "Bad FAT". Se necesita
+la DiskROM del SDF-Pico (`make rom`), que espera `OCUPADO` en 0.
