@@ -135,7 +135,7 @@ WriteByte:
 
 ;Despues del comando, ~60 us antes de volver: el firmware tiene que ver el
 ;comando y levantar OCUPADO antes de que un ReadByte consulte el estado, y
-;puede estar terminando una tarea corta (el checksum de un sector).
+;puede estar terminando una tarea corta.
 WriteCommand:
 	OUT		(PORT_CMD),A
 	PUSH	BC
@@ -143,11 +143,6 @@ WriteCommand:
 .WCDLY:
 	DJNZ	.WCDLY			;16 x 13 T
 	POP		BC
-	RET
-
-WriteBlock:
-	OUTI
-	JR		NZ,WriteBlock
 	RET
 
 ;Un byte de la respuesta. Si el firmware no la tiene lista en ~2,6 s,
@@ -183,15 +178,6 @@ WaitReady:
 	POP		BC
 	RET
 
-;Un bloque de 256 bytes de un sector. La espera se hace una vez por sector,
-;en RDSEC: con OCUPADO en 0 el sector entero ya esta en camino por DMA.
-ReadBlock:
-	IN		D,(C)
-	LD		(HL),D
-	XOR		D		; CHECKSUM XOR8 EN EL ACUMULADOR
-	INC		HL
-	DJNZ	ReadBlock
-	RET
 
 ;----Reloj: MYCHKCLK/MYGETTI/MYSETDA/MYSETTI----
 ;
@@ -414,9 +400,9 @@ WRITE:
 	LD		D,B				;store n-sectors ;/\
 WRSEC:
 	PUSH	BC				;only B matters
-	LD		BC,0			;B=0 to count until 256, C=0 for OUTI
-	CALL	WriteBlock		;256 bytes
-	CALL	WriteBlock		;256 bytes
+	LD		BC,PORT_DATA	;B=0: 256 bytes por OTIR; C=puerto de datos
+	OTIR					;21 T por byte: la PIO toma cada uno en ~100 ns
+	OTIR
 	POP		BC
 	CALL	WaitReady		;el firmware guarda el sector
 	LD		A,10			;write fault, si no termina
@@ -464,28 +450,11 @@ RDSEC:
 	LD		A,2				;not ready, si no llega
 	JR		C,DSKIOERROR	;B = sectores que faltan
 	PUSH	BC				;only B matters
-	LD		BC,0			;B=0 to count until 256 bytes, C=0 for INI
-	XOR		A				;calculated checksum
-	CALL	ReadBlock		;256 bytes
-	CALL	ReadBlock		;256 bytes
-	;INC		C				;C=1
-	
-	PUSH	AF
-	LD		A,CMD_DEBUG
-	CALL	WriteCommand
-	POP		AF
-	CALL	WriteByte
-	
-	;IN		D,(C)			;remote checksum
+	LD		BC,PORT_DATA	;B=0: 256 bytes por INIR; C=puerto de datos
+	INIR					;21 T por byte: el firmware tiene el sector entero
+	INIR					;en camino por DMA desde que bajo OCUPADO
 	POP		BC
-	;CP		D				;compare checksums
-	;JR		Z,RDS_CONTINUE
-	;SCF
-	;LD		A,4				;checksum error
-	;RET
-RDS_CONTINUE:
 	DJNZ	RDSEC			;relative jump
-	;ld		a,12
 	SCF
 	CCF						;no errors
 	RET

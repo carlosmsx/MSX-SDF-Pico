@@ -48,7 +48,7 @@ aire, que se lee como FFh.
 | `WriteCommand` | `OUT (01h),A` y ~60 µs de espera, para que el firmware levante `OCUPADO` antes de cualquier consulta |
 | `WaitReady` | Consulta el estado hasta ver `OCUPADO` en 0, con un límite de ~2,6 s |
 | `ReadByte` | `WaitReady` y después `IN A,(00h)`; si se agota el tiempo devuelve `FFh`, como el bus al aire |
-| `ReadBlock` / `WriteBlock` | 256 bytes con `INI`/`OUTI`, sin espera por byte |
+| Sectores | `INIR`/`OTIR` de 256 bytes, dos por sector: 21 estados T por byte, sin espera ni checksum por byte |
 
 `ReadByte` espera antes de cada byte, no solo del primero. Como el firmware
 baja `OCUPADO` recién con la respuesta completa encolada, la espera de los
@@ -114,11 +114,16 @@ Las tareas propias del firmware que tardan (reintentar la SD) también ponen
 
 ## `CMD_DEBUG`, la excepción
 
-La ROM manda `CMD_DEBUG` y el checksum XOR de cada sector en medio de un
-`CMD_READ`. Es el único comando que no corta la transacción en curso: no
+La ROM del SDF-1 manda `CMD_DEBUG` y el checksum XOR de cada sector en medio
+de un `CMD_READ`. Es el único comando que no corta la transacción en curso: no
 levanta `OCUPADO` ni descarta los sectores que quedan por leer. El firmware
 compara el checksum con el del sector enviado y lleva la cuenta, que muestra
 `CALL SDFDEBUG`.
+
+La DiskROM del SDF-Pico ya no lo manda: lee los sectores con `INIR`, a 21
+estados T por byte, y calcular el checksum costaba otros 21. Sirvió para
+validar el bus (miles de sectores sin un error). El firmware lo sigue
+atendiendo, así que una ROM de diagnóstico puede volver a usarlo.
 
 ## Condición de carrera al enviar un comando
 
