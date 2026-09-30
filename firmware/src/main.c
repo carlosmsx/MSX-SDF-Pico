@@ -31,6 +31,7 @@
 
 static PIO pio = pio0;
 static uint sm_bus, sm_est;
+static uint off_bus, off_est;
 static PIO pio_espia = pio1;
 static uint sm_espia;   // solo con DIAGNOSTICO
 static int dma_tx;
@@ -73,8 +74,8 @@ static void bus_init(void)
     gpio_set_dir(PIN_EN, GPIO_OUT);
 
     // sdf_bus va en la direccion 0 (.origin 0), por la tabla de out pc.
-    uint off_bus = pio_add_program(pio, &sdf_bus_program);
-    uint off_est = pio_add_program(pio, &sdf_estado_program);
+    off_bus = pio_add_program(pio, &sdf_bus_program);
+    off_est = pio_add_program(pio, &sdf_estado_program);
     sm_bus = pio_claim_unused_sm(pio, true);
     sm_est = pio_claim_unused_sm(pio, true);
 
@@ -84,16 +85,13 @@ static void bus_init(void)
     sm_config_set_jmp_pin(&c, PIN_IOSEL);
     sm_config_set_out_shift(&c, true, false, 32);
     pio_sm_init(pio, sm_bus, off_bus + sdf_bus_offset_entrada, &c);
-    pio_sm_exec(pio, sm_bus, pio_encode_mov_not(pio_x, pio_null)); // X = FFh
 
     c = sdf_estado_program_get_default_config(off_est);
     sm_config_set_in_pin_base(&c, PIN_D0);
     sm_config_set_out_pins(&c, PIN_D0, 8);
     sm_config_set_out_shift(&c, true, false, 32);
     pio_sm_init(pio, sm_est, off_est, &c);  // RX en modo GET, por .fifo txget
-    pio_sm_exec(pio, sm_est, pio_encode_set(pio_y, 2));
-
-    pio_enable_sm_mask_in_sync(pio, (1u << sm_bus) | (1u << sm_est));
+    // Las SM arrancan en bus_despertar(), cuando el MSX esta encendido.
 
     if (!DIAGNOSTICO)
         return;
@@ -121,6 +119,50 @@ static void espia_informe(void)
                (int)((g >> PIN_IOSEL) & 1), (int)((g >> PIN_A0) & 1),
                (int)((g >> PIN_RD) & 1), (unsigned long)((g >> PIN_D0) & 0xFF));
     }
+}
+
+// Con el MSX apagado todo el bus esta en 0, /IOSEL incluido: la PIO lo
+// tomaria como una lectura que no termina y quedaria manejando el bus sobre
+// un '245 sin alimentacion. Las SM solo corren con el bus vivo: se arrancan
+// cuando /IOSEL lleva 100 ms en alto, y se detienen si queda en bajo mas de
+// 50 us, cosa que ningun ciclo de I/O real hace (dura menos de 1 us).
+#define BUS_VIVO_MS     100
+#define BUS_MUERTO_US   50
+
+static void bus_dormir(void)
+{
+    pio_set_sm_mask_enabled(pio, (1u << sm_bus) | (1u << sm_est), false);
+    pio_sm_set_consecutive_pindirs(pio, sm_bus, PIN_D0, 8, false);
+}
+
+// true si /IOSEL se mantiene en bajo, sin ninguna subida, durante us.
+static bool iosel_bajo_sostenido(uint32_t us)
+{
+    uint32_t t0 = time_us_32();
+    while (time_us_32() - t0 < us) {
+        if (gpio_get(PIN_IOSEL))
+            return false;
+    }
+    return true;
+}
+
+static void bus_despertar(void)
+{
+    // Esperar /IOSEL en alto sin interrupcion durante BUS_VIVO_MS.
+    absolute_time_t desde = get_absolute_time();
+    while (absolute_time_diff_us(desde, get_absolute_time()) < BUS_VIVO_MS * 1000) {
+        if (!gpio_get(PIN_IOSEL))
+            desde = get_absolute_time();
+    }
+
+    pio_sm_clear_fifos(pio, sm_bus);
+    pio_sm_restart(pio, sm_bus);
+    pio_sm_restart(pio, sm_est);
+    pio_sm_exec(pio, sm_bus, pio_encode_jmp(off_bus + sdf_bus_offset_entrada));
+    pio_sm_exec(pio, sm_bus, pio_encode_mov_not(pio_x, pio_null)); // X = FFh
+    pio_sm_exec(pio, sm_est, pio_encode_jmp(off_est));
+    pio_sm_exec(pio, sm_est, pio_encode_set(pio_y, 2));
+    pio_enable_sm_mask_in_sync(pio, (1u << sm_bus) | (1u << sm_est));
 }
 
 static void estado(uint8_t v)
@@ -153,6 +195,10 @@ int main(void)
         printf("SOLO_ESCUCHA: la Pico no maneja el bus\n");
     dma_init();
     estado(EST_VIVO);
+    bus_despertar();
+    printf("bus vivo: atendiendo 00h/01h\n");
+    uint32_t iosel_bajo_desde = 0;
+    bool iosel_bajo = false;
 
     bool eco = false;
     uint8_t ultimo_est = 0;
@@ -170,6 +216,25 @@ int main(void)
         if (iosel_ant && !iosel)
             bajadas++;
         iosel_ant = iosel;
+
+        if (iosel) {
+            iosel_bajo = false;
+        } else if (!iosel_bajo) {
+            iosel_bajo = true;
+            iosel_bajo_desde = time_us_32();
+        } else if (time_us_32() - iosel_bajo_desde > BUS_MUERTO_US) {
+            // Entre las dos lecturas pudo haber un printf largo: confirmar
+            // mirando el pin sin pausa antes de dar el bus por muerto.
+            if (iosel_bajo_sostenido(BUS_MUERTO_US)) {
+                bus_dormir();
+                dma_channel_abort(dma_tx);
+                eco = false;
+                printf("bus muerto (MSX apagado?): Pico en espera\n");
+                bus_despertar();
+                printf("bus vivo: atendiendo 00h/01h\n");
+            }
+            iosel_bajo = false;
+        }
 
         if (DIAGNOSTICO)
             espia_informe();
