@@ -259,9 +259,14 @@ int main(void)
             bool cmd = (w >> (PIN_A0 - PIN_D0)) & 1;
 
             if (cmd) {
-                printf("OUT 01h = %02X\n", dato);
+                // Un comando nuevo descarta lo que haya quedado para leer de
+                // 00h. El drenaje ejecuta pull noblock en la SM: es seguro
+                // porque ahora esta esperando la proxima bajada de /IOSEL, y
+                // en entrada el OSR se recarga con los pines.
                 dma_channel_abort(dma_tx);
+                pio_sm_drain_tx_fifo(pio, sm_bus);
                 eco = false;
+                printf("OUT 01h = %02X\n", dato);
                 switch (dato) {
                 case CMD_ECO:      eco = true;     break;
                 case CMD_CONTADOR: dma_contador(); break;
