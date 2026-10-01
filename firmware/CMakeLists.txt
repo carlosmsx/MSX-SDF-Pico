@@ -20,6 +20,9 @@ set(FUENTES
     src/consola.c
     src/wifi.c
     src/menu_wifi.c
+    src/ajustes.c
+    src/reloj.c
+    src/dispositivos.c
     lib/fatfs/ff.c
 )
 # src/disco.c (el disco en la flash de la Pico, docs/DISCO-FLASH.md) quedo
@@ -46,6 +49,7 @@ function(firmware nombre)
         hardware_spi
         hardware_flash
         pico_cyw43_arch_lwip_threadsafe_background
+        pico_lwip_sntp
     )
     pico_add_extra_outputs(${nombre})
 endfunction()

@@ -3,7 +3,9 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/sync.h"
+#include "ajustes.h"
 #include "menu_wifi.h"
+#include "reloj.h"
 #include "wifi.h"
 
 // ---- Buzon entre nucleos ----
@@ -105,12 +107,15 @@ static void volcar(void)
 #define T_BS        0x08
 #define T_RETURN    0x0D
 #define T_ESC       0x1B
+#define T_DERECHA   0x1C
+#define T_IZQUIERDA 0x1D
 #define T_ARRIBA    0x1E
 #define T_ABAJO     0x1F
 #define T_DEL       0x7F
 
 enum { M_FUERA, M_LISTA, M_CLAVE, M_CONECTANDO, M_RESULTADO, M_SIN_WIFI };
-enum { O_BUSCAR, O_OLVIDAR, O_SALIR };
+enum { O_BUSCAR, O_OLVIDAR, O_ZONA, O_SALIR };
+#define OPC_MAX 4
 
 static int modo = M_FUERA;
 static int cursor;
@@ -128,12 +133,12 @@ static void borrar_clave(void)
     n_clave = 0;
 }
 
-// Redes que entran en la pantalla: lo que sobra del encabezado (4 filas), las
-// opciones (hasta 3, con una fila en blanco antes) y la ayuda (con otra).
+// Redes que entran en la pantalla: lo que sobra del encabezado (5 filas), las
+// opciones (hasta 4, con una fila en blanco antes) y la ayuda (con otra).
 static int redes_visibles(const wifi_red_t **r)
 {
     int n = wifi_redes(r);
-    int lugar = filas - 10;
+    int lugar = filas - 12;
     return n < lugar ? n : (lugar > 0 ? lugar : 0);
 }
 
@@ -143,6 +148,7 @@ static int opciones(int *opc)
     opc[n++] = O_BUSCAR;
     if (wifi_red_guardada()[0])
         opc[n++] = O_OLVIDAR;
+    opc[n++] = O_ZONA;
     opc[n++] = O_SALIR;
     return n;
 }
@@ -162,16 +168,22 @@ static bool teclear(uint8_t t)
     case M_LISTA: {
         const wifi_red_t *r;
         int nvis = redes_visibles(&r);
-        int opc[3];
+        int opc[OPC_MAX];
         int nopc = opciones(opc);
         int total = nvis + nopc;
+        bool en_zona = cursor >= nvis && opc[cursor - nvis] == O_ZONA;
         if (t == T_ESC)
             return true;
         if (t == T_ARRIBA)
             cursor = (cursor + total - 1) % total;
         else if (t == T_ABAJO)
             cursor = (cursor + 1) % total;
-        else if (t == T_RETURN && cursor < nvis) {
+        else if (en_zona && (t == T_IZQUIERDA || t == T_DERECHA)) {
+            // De a una hora; se graba al salir del menu (cerrar)
+            int z = reloj_zona() + (t == T_DERECHA ? 60 : -60);
+            if (z >= -12 * 60 && z <= 14 * 60)
+                reloj_poner_zona(z);
+        } else if (t == T_RETURN && cursor < nvis) {
             strcpy(elegida, r[cursor].ssid);
             borrar_clave();
             if (r[cursor].abierta) {
@@ -184,6 +196,7 @@ static bool teclear(uint8_t t)
             switch (opc[cursor - nvis]) {
             case O_BUSCAR:  wifi_buscar(); break;
             case O_OLVIDAR: wifi_olvidar(); break;
+            case O_ZONA:    break;
             case O_SALIR:   return true;
             }
         }
@@ -244,18 +257,25 @@ static void encabezado(void)
         linea(1, "Sin conexion a %s", wifi_red_guardada());
         break;
     }
+    char txt[20];
+    reloj_texto(txt);
+    if (reloj_origen() == RELOJ_SIN_PONER)
+        linea(3, "Hora sin poner");
+    else
+        linea(3, "Hora %s", txt);
 }
 
 static void dibujar_lista(void)
 {
     const wifi_red_t *r;
     int nvis = redes_visibles(&r);
-    int opc[3];
+    int opc[OPC_MAX];
     int nopc = opciones(opc);
     if (cursor >= nvis + nopc)
         cursor = nvis + nopc - 1;
+    bool en_zona = cursor >= nvis && opc[cursor - nvis] == O_ZONA;
 
-    int f = 4;
+    int f = 5;
     if (nvis == 0)
         linea(f++, "  %s", wifi_buscando() ? "Buscando redes..." : "No se encontraron redes");
     // "> nombre             -52*": el * marca la red guardada
@@ -268,13 +288,17 @@ static void dibujar_lista(void)
     f++;
     static const char *const nombre[] = {
         [O_BUSCAR] = "Buscar redes", [O_OLVIDAR] = "Olvidar la red guardada",
-        [O_SALIR] = "Salir",
+        [O_ZONA] = "Zona horaria:", [O_SALIR] = "Salir",
     };
+    char zona[12];
+    reloj_texto_zona(zona, reloj_zona());
     for (int i = 0; i < nopc; i++)
-        linea(f++, "%c %s", cursor == nvis + i ? '>' : ' ', nombre[opc[i]]);
+        linea(f++, "%c %s %s", cursor == nvis + i ? '>' : ' ', nombre[opc[i]],
+              opc[i] == O_ZONA ? zona : "");
 
-    linea(filas - 1, "%s", wifi_buscando() && nvis > 0 ? "Buscando redes..."
-                                                       : "Cursor y RETURN elige, ESC sale");
+    linea(filas - 1, "%s", en_zona ? "Cursor izquierda/derecha cambia"
+                           : wifi_buscando() && nvis > 0 ? "Buscando redes..."
+                           : "Cursor y RETURN elige, ESC sale");
 }
 
 static void dibujar_clave(void)
@@ -358,6 +382,7 @@ static void empezar(void)
 
 static void cerrar(void)
 {
+    ajustes_poner_zona(reloj_zona());   // solo graba si cambio
     modo = M_FUERA;
     borrar_clave();
     out(CLS);

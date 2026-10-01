@@ -39,3 +39,11 @@
 
 #define LWIP_STATS                  0
 #define LWIP_STATS_DISPLAY          0
+
+// SNTP (reloj.c): la hora de Internet al conectar y despues cada hora.
+#define SNTP_SERVER_DNS             1
+#define SNTP_UPDATE_DELAY           (60 * 60 * 1000)
+#include <stdint.h>
+void reloj_internet(uint32_t utc);
+#define SNTP_SET_SYSTEM_TIME(sec)   reloj_internet(sec)
+#define MEMP_NUM_SYS_TIMEOUT        (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 2)

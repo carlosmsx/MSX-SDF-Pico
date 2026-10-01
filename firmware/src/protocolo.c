@@ -18,9 +18,11 @@
 #include "pico/stdlib.h"
 #include "bus.h"
 #include "consola.h"
+#include "dispositivos.h"
 #include "imagenes.h"
 #include "menu_wifi.h"
 #include "protocolo.h"
+#include "reloj.h"
 #include "sd_spi.h"
 
 // ---- Parametros de cada comando ----
@@ -262,8 +264,39 @@ static void ejecutar(void)
     case CMD_DSKCHG:    resp[n++] = img_cambio(par[0]); break;
     case CMD_DSKFMT:    resp[n++] = img_media(par[0]); break;
 
-    case CMD_RTCCHK:    resp[n++] = 0; break;           // sin reloj
-    case CMD_RTCGET:    memset(resp, 0, 7); n = 7; break;
+    // Reloj del kernel: siempre hay reloj (reloj.c). Si todavia no se puso,
+    // arranca en 1980-01-01 y SNTP lo corrige en cuanto hay red.
+    case CMD_RTCCHK:    resp[n++] = 0xFF; break;
+    case CMD_RTCGET: {
+        fecha_t f;
+        reloj_leer(&f);
+        resp[n++] = f.anio - 1980;
+        resp[n++] = f.mes;
+        resp[n++] = f.dia;
+        resp[n++] = f.hora;
+        resp[n++] = f.min;
+        resp[n++] = f.seg;
+        resp[n++] = f.dia_semana;
+        break;
+    }
+    case CMD_RTCSETDA:
+    case CMD_RTCSETTI: {
+        // DATE y TIME de DOS: cambian la fecha o la hora, el resto queda
+        fecha_t f;
+        reloj_leer(&f);
+        if (cmd == CMD_RTCSETDA) {
+            f.anio = 1980 + par[0];
+            f.mes = par[1];
+            f.dia = par[2];
+        } else {
+            f.hora = par[0];
+            f.min = par[1];
+            f.seg = par[2];
+        }
+        if (!reloj_poner(&f))
+            con_printf("reloj: fecha invalida de DOS\n");
+        break;
+    }
 
     case CMD_SDFTEST:
         resp[n++] = PROTOCOL_VERSION;
@@ -291,12 +324,18 @@ static void ejecutar(void)
                               io_buf, 64 * SECTOR, nueva_avance);
         break;
 
-    // Sin dispositivos todavia: DEVNAME no reconoce ningun nombre.
-    case CMD_DEVNAME:   resp[n++] = DEV_NONE; break;
-    case CMD_DEVOPEN:   resp[n++] = ERR_DEVICE_IO; break;
-    case CMD_DEVIN:     resp[n++] = 0; break;
-    case CMD_DEVEOF:    resp[n++] = 0xFF; break;
-    case CMD_DEVOUT:    if (par[0] == 13) resp[n++] = ERR_DEVICE_IO; break;
+    // Dispositivos de BASIC (dispositivos.c)
+    case CMD_DEVNAME:   resp[n++] = dev_nombre((char *)par); break;
+    case CMD_DEVOPEN:   resp[n++] = dev_abrir(par[0], par[1], (char *)par + 3, par[2]); break;
+    case CMD_DEVCLOSE:  dev_cerrar(par[0], par[1]); break;
+    case CMD_DEVIN:     resp[n++] = dev_leer(); break;
+    case CMD_DEVEOF:    resp[n++] = dev_eof(); break;
+    case CMD_DEVOUT: {
+        int r = dev_escribir(par[0]);
+        if (r >= 0)
+            resp[n++] = r;
+        break;
+    }
 
     // Prueba del bus
     case CMD_ECO:       etapa = E_ECO; break;

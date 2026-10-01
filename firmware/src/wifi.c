@@ -3,70 +3,26 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
-#include "hardware/flash.h"
-#include "hardware/sync.h"
+#include "lwip/apps/sntp.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
+#include "ajustes.h"
+#include "reloj.h"
 #include "wifi.h"
 
-// ---- Credenciales en la flash ----
-//
-// Ultimo sector de la flash (4 KB), lejos del programa. Grabar un .uf2 no lo
-// toca: las credenciales sobreviven a las actualizaciones del firmware.
-// Grabar sin detener al nucleo 1 es seguro porque todo el programa corre de
-// la RAM (copy_to_ram) y el nucleo 1 nunca lee la flash. Lo unico que queda
-// en la flash es el firmware del CYW43, y solo se lee en wifi_init.
-
-#define CRED_OFFSET     (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
-#define CRED_MAGIA      0x49464957u     // "WIFI"
-
+// Una red con su clave. La guardada vive en ajustes.c.
 typedef struct {
-    uint32_t magia;
     char ssid[WIFI_SSID_MAX + 1];
     char clave[WIFI_CLAVE_MAX + 1];
-    uint32_t suma;
 } cred_t;
 
-static cred_t guardada;         // la de la flash; ssid vacio = ninguna
-
-static uint32_t suma_de(const cred_t *c)
+static cred_t guardada(void)
 {
-    const uint8_t *p = (const uint8_t *)c;
-    uint32_t s = 0x5DF;
-    for (size_t i = 0; i < offsetof(cred_t, suma); i++)
-        s = (s << 5) + s + p[i];
-    return s;
-}
-
-static void cred_leer(void)
-{
-    const cred_t *f = (const cred_t *)(XIP_BASE + CRED_OFFSET);
-    memset(&guardada, 0, sizeof guardada);
-    if (f->magia == CRED_MAGIA && f->suma == suma_de(f)
-        && f->ssid[WIFI_SSID_MAX] == 0 && f->clave[WIFI_CLAVE_MAX] == 0)
-        guardada = *f;
-}
-
-// c = NULL borra el sector (olvidar la red).
-static void cred_grabar(const cred_t *c)
-{
-    static uint8_t pagina[FLASH_PAGE_SIZE];
-    memset(pagina, 0xFF, sizeof pagina);
-    if (c) {
-        cred_t *p = (cred_t *)pagina;
-        *p = *c;
-        p->magia = CRED_MAGIA;
-        p->suma = suma_de(p);
-    }
-
-    uint32_t ints = save_and_disable_interrupts();
-    flash_range_erase(CRED_OFFSET, FLASH_SECTOR_SIZE);
-    if (c)
-        flash_range_program(CRED_OFFSET, pagina, FLASH_PAGE_SIZE);
-    restore_interrupts(ints);
-
-    memset(pagina, 0, sizeof pagina);   // que la clave no quede en la RAM
-    cred_leer();
+    cred_t c;
+    memset(&c, 0, sizeof c);
+    strcpy(c.ssid, ajustes_ssid());
+    strcpy(c.clave, ajustes_clave());
+    return c;
 }
 
 // ---- Conexion ----
@@ -137,7 +93,7 @@ static void fallo(const char *motivo)
     memset(&intento, 0, sizeof intento);
     intento_nuevo = false;
     cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
-    if (guardada.ssid[0]) {
+    if (ajustes_ssid()[0]) {
         estado = WIFI_ESPERA;
         plazo = make_timeout_time_ms(REINTENTO_MS);
     } else {
@@ -149,18 +105,50 @@ static void buscar_terminar(void);
 
 bool wifi_init(void)
 {
-    cred_leer();
     if (cyw43_arch_init()) {
         printf("wifi: el CYW43 no contesta\n");
         return false;
     }
     cyw43_arch_enable_sta_mode();
     estado = WIFI_SIN_RED;
-    if (guardada.ssid[0])
-        conectar(&guardada, false);
-    else
+    if (ajustes_ssid()[0]) {
+        cred_t c = guardada();
+        conectar(&c, false);
+        memset(&c, 0, sizeof c);
+    } else
         printf("wifi: sin red guardada (\"ayuda\" para configurarla)\n");
     return true;
+}
+
+// La hora por SNTP (reloj.c), desde la primera conexion. lwIP pide la hora
+// cada SNTP_UPDATE_DELAY (lwipopts.h) y la entrega con SNTP_SET_SYSTEM_TIME,
+// en la interrupcion: aca solo se avisa por la consola.
+static void hora_de_internet(void)
+{
+    static bool andando;
+    if (andando)
+        return;
+    andando = true;
+    cyw43_arch_lwip_begin();
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, "pool.ntp.org");
+    sntp_init();
+    cyw43_arch_lwip_end();
+}
+
+static void avisar_hora(void)
+{
+    static uint32_t vistas;
+    uint32_t n = reloj_sincronizaciones();
+    if (n == vistas)
+        return;
+    bool primera = vistas == 0;
+    vistas = n;
+    if (primera) {
+        char txt[20];
+        reloj_texto(txt);
+        printf("reloj: hora de internet, %s\n", txt);
+    }
 }
 
 void wifi_tarea(void)
@@ -170,6 +158,7 @@ void wifi_tarea(void)
         return;
     prox = make_timeout_time_ms(SONDEO_MS);
     buscar_terminar();
+    avisar_hora();
 
     int s = link();
     bool cambio = s != ultimo_link;
@@ -181,14 +170,15 @@ void wifi_tarea(void)
             printf("wifi: conectado a \"%s\", IP %s\n", intento.ssid, wifi_ip());
             estado = WIFI_CONECTADO;
             if (intento_nuevo) {
-                if (strcmp(intento.ssid, guardada.ssid) != 0
-                    || strcmp(intento.clave, guardada.clave) != 0) {
-                    cred_grabar(&intento);
+                if (strcmp(intento.ssid, ajustes_ssid()) != 0
+                    || strcmp(intento.clave, ajustes_clave()) != 0) {
+                    ajustes_poner_red(intento.ssid, intento.clave);
                     printf("wifi: red guardada\n");
                 }
                 resultado = 1;
             }
             intento_nuevo = false;
+            hora_de_internet();
         } else if (s == CYW43_LINK_BADAUTH || s == CYW43_LINK_NONET
                    || s == CYW43_LINK_FAIL) {
             fallo(texto_link(s));
@@ -203,8 +193,11 @@ void wifi_tarea(void)
         }
         break;
     case WIFI_ESPERA:
-        if (time_reached(plazo) && guardada.ssid[0])
-            conectar(&guardada, false);
+        if (time_reached(plazo) && ajustes_ssid()[0]) {
+            cred_t c = guardada();
+            conectar(&c, false);
+            memset(&c, 0, sizeof c);
+        }
         break;
     default:
         if (cambio)
@@ -227,7 +220,7 @@ const char *wifi_red(void)
 
 const char *wifi_red_guardada(void)
 {
-    return guardada.ssid;
+    return ajustes_ssid();
 }
 
 const char *wifi_ip(void)
@@ -272,8 +265,7 @@ void wifi_olvidar(void)
     cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
     memset(&intento, 0, sizeof intento);
     intento_nuevo = false;
-    if (guardada.ssid[0])
-        cred_grabar(NULL);
+    ajustes_poner_red(NULL, NULL);
     estado = WIFI_SIN_RED;
     printf("wifi: red olvidada\n");
 }
@@ -389,7 +381,7 @@ static void mostrar_estado(void)
         printf("wifi: apagado (el CYW43 no contesto al arrancar)\n");
         return;
     }
-    printf("wifi: red guardada: %s\n", guardada.ssid[0] ? guardada.ssid : "ninguna");
+    printf("wifi: red guardada: %s\n", ajustes_ssid()[0] ? ajustes_ssid() : "ninguna");
     if (estado == WIFI_CONECTADO)
         printf("wifi: conectado a \"%s\", IP %s, %d dBm\n",
                intento.ssid, wifi_ip(), wifi_senal());

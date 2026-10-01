@@ -40,6 +40,8 @@ Con el Wi-Fi, la RAM usada pasa de ~222 KB a ~355 KB de 512 KB.
 La red y la clave se guardan en el **último sector de la flash** (4 KB, en
 `PICO_FLASH_SIZE_BYTES - 4096`), con una suma de verificación. Grabar un
 `.uf2` no toca ese sector: las credenciales sobreviven a las actualizaciones.
+La segunda página del sector guarda la zona horaria (`RELOJ.md`); las dos
+están en `firmware/src/ajustes.c`.
 
 - Se graban solo cuando la conexión funciona.
 - La clave no se muestra nunca: la consola informa la red, no la clave. Al
@@ -65,6 +67,7 @@ Menú en la pantalla del MSX, desde BASIC:
 SDF-Pico: red Wi-Fi
 Conectado a MiCasa
 IP 192.168.1.47
+Hora 2026-09-30 21:05:07
 
 > MiCasa                         -52*
   Vecino                         -71
@@ -72,6 +75,7 @@ IP 192.168.1.47
 
   Buscar redes
   Olvidar la red guardada
+  Zona horaria: UTC-3
   Salir
 
 Cursor y RETURN elige, ESC sale
@@ -85,6 +89,8 @@ Cursor y RETURN elige, ESC sale
   sigue.
 - Si conecta, la red queda guardada. Si no, muestra el motivo (clave
   incorrecta, red no encontrada) y sigue la anterior.
+- En "Zona horaria", las flechas izquierda y derecha la cambian de a una
+  hora. Se guarda al salir del menú.
 - `ESC` en el menú, o `CTRL+STOP` en cualquier momento, sale y limpia la
   pantalla.
 

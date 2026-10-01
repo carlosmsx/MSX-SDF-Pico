@@ -18,13 +18,64 @@
 #include "bus.h"
 #include "consola.h"
 #include "protocolo.h"
+#include "ajustes.h"
 #include "menu_wifi.h"
+#include "reloj.h"
 #include "wifi.h"
+
+static void mostrar_hora(void)
+{
+    static const char *const origen[] = {
+        [RELOJ_SIN_PONER] = "sin poner", [RELOJ_INTERNET] = "de internet",
+        [RELOJ_A_MANO] = "puesta a mano",
+    };
+    char txt[20], zona[12];
+    reloj_texto(txt);
+    reloj_texto_zona(zona, reloj_zona());
+    printf("reloj: %s %s, %s\n", txt, zona, origen[reloj_origen()]);
+}
+
+// "zona -3", "zona +5:30", "zona 0"
+static bool leer_zona(const char *txt, int *minutos)
+{
+    int signo = 1, h = 0, m = 0;
+    if (*txt == '-' || *txt == '+')
+        signo = *txt++ == '-' ? -1 : 1;
+    if (*txt < '0' || *txt > '9')
+        return false;
+    while (*txt >= '0' && *txt <= '9')
+        h = h * 10 + (*txt++ - '0');
+    if (*txt == ':') {
+        txt++;
+        if (txt[0] < '0' || txt[0] > '9' || txt[1] < '0' || txt[1] > '9' || txt[2])
+            return false;
+        m = (txt[0] - '0') * 10 + (txt[1] - '0');
+    } else if (*txt) {
+        return false;
+    }
+    *minutos = signo * (h * 60 + m);
+    return m < 60 && *minutos >= -12 * 60 && *minutos <= 14 * 60;
+}
 
 static void comando(const char *linea)
 {
     if (linea[0] == 0 || wifi_comando(linea))
         return;
+    if (strcmp(linea, "hora") == 0) {
+        mostrar_hora();
+        return;
+    }
+    if (strncmp(linea, "zona ", 5) == 0) {
+        int m;
+        if (!leer_zona(linea + 5, &m)) {
+            printf("uso: zona -3, zona +5:30 (entre -12 y +14)\n");
+            return;
+        }
+        reloj_poner_zona(m);
+        ajustes_poner_zona(m);
+        mostrar_hora();
+        return;
+    }
     if (strcmp(linea, "ayuda") != 0)
         printf("comando desconocido: %s\n", linea);
     printf("comandos:\n"
@@ -32,12 +83,16 @@ static void comando(const char *linea)
            "  buscar        lista las redes a la vista\n"
            "  conectar <n>  conecta a la red n de la lista (o por nombre);\n"
            "                pide la clave y, si conecta, la guarda\n"
-           "  olvidar       borra la red guardada\n");
+           "  olvidar       borra la red guardada\n"
+           "  hora          fecha, hora y de donde salio\n"
+           "  zona <h>      zona horaria: zona -3, zona +5:30\n");
 }
 
 int main(void)
 {
     stdio_init_all();
+    ajustes_leer();
+    reloj_init(ajustes_zona());
     bus_init();
     multicore_launch_core1(protocolo_core1);
 
