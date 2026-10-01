@@ -1,42 +1,118 @@
 # MSX-SDF-Pico
 
-Lector de tarjetas SD para MSX basado en una **Raspberry Pi Pico 2** (RP2350),
-montada sobre la placa del [MSX-SDF-1](../MSX-SDF-1) en lugar del ATmega328P.
+Un **perfil del [MSX-SDF-1](https://github.com/carlosmsx/MSX-SDF-1)**: la misma
+placa de I/O en formato cartucho, con una **Raspberry Pi Pico 2 W** (RP2350) en
+lugar del ATmega328P.
 
-De la placa original se conservan el decodificador de puertos (dos `'138`), el
-búfer de datos (`'245`) y la EEPROM con la DiskROM. La Pico atiende el bus del
-MSX con sus bloques PIO y alimenta las transferencias por DMA, lo que permite
-responder a cada acceso sin detener al Z80.
+El SDF-1 está pensado como un kit, en el que cada proyecto cambia la ROM, el
+firmware y lo que se monta en el área de islas perforadas. Este proyecto lleva
+esa idea un paso más allá y reemplaza también el microcontrolador. De la placa
+original se conservan el decodificador de puertos (dos `'138`), el búfer de
+datos (`'245`) y la EEPROM W27C512. La Pico se monta sobre el área universal y
+atiende el bus del MSX con sus bloques PIO.
 
-> **Estado:** en desarrollo. En una Daewoo DPC-200, Disk BASIC arranca, lee y
-> escribe sin `/WAIT`, con la DiskROM propia. El soporte de la tarjeta SD
-> (`docs/SD.md`) está escrito y sin probar.
+El cambio de microcontrolador permite reunir en un solo cartucho tres funciones:
+
+- **Lector de memorias SD.** El cartucho presenta al MSX hasta dos unidades de
+  disco estándar y arranca MSX-DOS y Disk BASIC desde imágenes `.DSK`
+  guardadas en la tarjeta, igual que el lector del SDF-1.
+- **Wi-Fi.** El módulo inalámbrico de la Pico 2 W se configura desde el propio
+  MSX con `CALL WIFI`, un menú que busca las redes, pide la clave y la guarda.
+- **Reloj.** La fecha y la hora se obtienen de Internet al encender. MSX-DOS
+  arranca con la fecha correcta, los archivos se graban con su fecha, y
+  `CALL RTC` y `OPEN "RTC:"` permiten consultarlas desde BASIC, sin chip de
+  reloj ni pila.
+
+> **Estado: en desarrollo.** Las tres funciones están probadas en una Daewoo
+> DPC-200, la única máquina en la que se ensayó hasta ahora. La placa es una
+> SDF-1 rev1 con una sola modificación (ver
+> [hardware/CABLEADO.md](hardware/CABLEADO.md)).
+
+## Las decisiones de diseño
+
+**Sin `/WAIT`.** El SDF-1 detiene al Z80 en cada acceso hasta que el ATmega
+responde. El SDF-Pico prescinde de esa señal, y la línea queda cortada en la
+placa. La PIO contesta un `IN` en alrededor de 100 ns, contra una ventana de
+unos 550 ns, de modo que el dato siempre llega a tiempo cuando está
+disponible. Cuando no lo está, por ejemplo mientras se lee un sector de la
+tarjeta, el registro de estado lo indica y la DiskROM espera antes de leer.
+
+**El registro de estado, finalmente en uso.** En el SDF-1 la lectura del
+puerto `0x01` está cableada pero devuelve un valor fijo. Acá es el mecanismo
+de sincronización: un bit de *ocupado*, otro de error y otro de cambio de
+disco. El protocolo es el del SDF-1 con ese único agregado (ver
+[docs/PROTOCOLO.md](docs/PROTOCOLO.md)).
+
+**PIO y DMA en lugar de interrupciones.** Cada acceso del Z80 lo atiende un
+programa PIO, sin intervención del procesador. Los sectores pasan por DMA
+entre la memoria y los FIFO de la PIO, y la DiskROM los transfiere con `INIR`
+y `OTIR`. En la DPC-200 se midieron unos 88 KB/s en lectura y 80 KB/s en
+escritura, contra unos 45 KB/s del SDF-1.
+
+**Un núcleo para el bus, otro para todo lo demás.** El núcleo 1 atiende el
+protocolo y la tarjeta SD, sin interrupciones. El núcleo 0 se ocupa del
+Wi-Fi, del reloj y de la consola USB. Todo el programa corre desde la RAM, de
+modo que grabar la flash o esperar a la red nunca demora una respuesta al MSX.
+
+**Los menús los arma el firmware.** `CALL WIFI` ocupa unos 100 bytes de la
+EEPROM: es una terminal que envía cada tecla y muestra lo que devuelve la
+Pico. El menú completo vive en el firmware, que se actualiza por USB sin
+regrabar la EEPROM.
+
+**La clave, fuera de la tarjeta.** La red, la clave y la zona horaria se
+guardan en la flash de la Pico, no en la SD, de modo que no viajan con la
+tarjeta. La clave no se muestra en ningún momento.
 
 ## Diferencias con el SDF-1
 
 | | SDF-1 | SDF-Pico |
 |---|---|---|
-| Microcontrolador | ATmega328P | RP2350 (Pico 2) |
-| Señal `/WAIT` | Detiene al Z80 en cada acceso | **No se usa**; la línea está cortada |
+| Microcontrolador | ATmega328P a 20 MHz | RP2350 (Pico 2 W) a 150 MHz |
+| Señal `/WAIT` | Detiene al Z80 en cada acceso | No se usa; la línea está cortada |
 | Sincronización | El `/WAIT` cubre el tiempo de respuesta | El Z80 consulta el registro de estado |
-| Transferencia de un byte | Rutina de interrupción | Programa PIO, sin intervención del núcleo |
-| Sectores | Byte a byte desde el firmware | DMA entre la memoria y los FIFO de la PIO |
+| Atención del bus | Rutina de interrupción | Programa PIO, sin intervención del procesador |
+| Sectores | Byte a byte desde el firmware | DMA entre la memoria y la PIO |
+| Reloj | DS1307 con pila, por I2C | Por Internet, sin chip |
+| Imágenes montadas | En la EEPROM del ATmega | En la tarjeta (`SDFPICO.CFG`) |
+| Red y zona horaria | — | En la flash de la Pico |
 | DiskROM | La del SDF-1 | Derivada de la del SDF-1, con consulta de estado |
 
-La decisión de fondo es prescindir de `/WAIT`. La PIO contesta un `IN` en
-alrededor de 100 ns, contra una ventana de unos 550 ns, de modo que el dato
-siempre llega a tiempo cuando está disponible. Cuando no lo está (por ejemplo,
-mientras se lee un sector de la tarjeta), el registro de estado lo indica y la
-DiskROM espera antes de leer.
+## Comandos desde BASIC
+
+| Comando | Función |
+|---|---|
+| `CALL SDFFILES` | Lista las imágenes `.DSK` de la tarjeta |
+| `CALL SDFMOUNT(drive, "NOMBRE")` | Monta una imagen en A: (0) o B: (1) |
+| `CALL SDFUMOUNT(drive)` | Deja el drive sin imagen |
+| `CALL SDFNEW("NOMBRE"[, tamaño])` | Crea una imagen vacía y formateada, de 720 o 360 KB |
+| `CALL SDFDRIVES(n)` | Cantidad de drives que ve el DOS, desde el próximo arranque |
+| `CALL WIFI` | Menú de la red Wi-Fi y de la zona horaria |
+| `CALL RTC` | Muestra la fecha y la hora; con un texto, las ajusta |
+| `CALL SDFTEST` | Versión del firmware, protocolo y estado de la tarjeta |
+| `CALL SDFDEBUG` | Contadores y velocidad de transferencia, para pruebas |
+
+Además, `OPEN "RTC:"` permite leer la fecha y la hora desde un programa, en
+varios formatos. El detalle de cada función está en la documentación.
+
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [hardware/CABLEADO.md](hardware/CABLEADO.md) | Modificación de la placa y cableado de la Pico |
+| [docs/SD.md](docs/SD.md) | La tarjeta, las imágenes y los `CALL SDF*` |
+| [docs/WIFI.md](docs/WIFI.md) | El Wi-Fi, `CALL WIFI` y la consola USB |
+| [docs/RELOJ.md](docs/RELOJ.md) | El reloj, la zona horaria y `OPEN "RTC:"` |
+| [docs/PROTOCOLO.md](docs/PROTOCOLO.md) | Protocolo entre la DiskROM y el firmware |
+| [docs/PRUEBA-BUS.md](docs/PRUEBA-BUS.md) | Prueba del bus desde BASIC, sin DiskROM |
 
 ## Estructura
 
 | Carpeta | Contenido |
 |---|---|
 | `diskrom/` | DiskROM (Z80), derivada de la del SDF-1 |
-| `hardware/` | Modificaciones a la placa del SDF-1 y cableado de la Pico |
+| `hardware/` | Modificación de la placa del SDF-1 y cableado de la Pico |
 | `firmware/` | Firmware de la Pico, en C con el pico-sdk |
-| `docs/` | Protocolo entre la DiskROM y el firmware, y procedimientos de prueba |
+| `docs/` | Documentación de cada función y del protocolo |
 | `tools/` | Armado de la ROM (`mkrom.py`, `patch_rtc_kernel.py`) |
 
 ## Compilación del firmware
@@ -50,7 +126,8 @@ cd firmware
 ```
 
 El resultado es `firmware/build/sdf_pico.uf2`, que se copia a la Pico
-conectada en modo BOOTSEL.
+conectada en modo BOOTSEL. Actualizar el firmware no borra la red ni la zona
+horaria guardadas.
 
 ## Compilación de la DiskROM
 

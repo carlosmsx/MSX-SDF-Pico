@@ -1,8 +1,8 @@
 # Wi-Fi
 
-> **Estado:** la conexión desde la consola USB (firmware 0.4) está probada.
-> El menú desde el MSX, `CALL WIFI` (firmware 0.5 y DiskROM nueva), compila y
-> no está probado.
+> **Estado:** probado en una Daewoo DPC-200: la conexión desde la consola USB
+> (firmware 0.4) y el menú `CALL WIFI` (firmware 0.5, con la DiskROM que lo
+> incluye).
 
 La Pico 2 W trae un CYW43439. El firmware lo usa en modo estación: se conecta
 a una red existente y obtiene la dirección por DHCP.

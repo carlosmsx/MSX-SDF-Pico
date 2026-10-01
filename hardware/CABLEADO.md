@@ -1,16 +1,18 @@
 # Placa y cableado
 
-El SDF-Pico usa una placa **SDF-1 rev1** con una sola modificación y la Pico 2
-en lugar del ATmega328P.
+El SDF-Pico usa una placa **SDF-1 rev1** con una sola modificación y una
+**Pico 2 W** en lugar del ATmega328P.
 
-Sirve tanto la Pico 2 como la **Pico 2 W**: tienen el mismo pinout, y los GPIO
-que la W reserva para el módulo inalámbrico (GP23 a GP25 y GP29) no salen a los
-pines ni se usan acá. El firmware se compila para la Pico 2 W.
+El Wi-Fi y el reloj requieren la Pico 2 W. La Pico 2 sin módulo inalámbrico
+tiene el mismo pinout y en principio alcanza para el lector de SD, pero con
+este firmware, que se compila para la Pico 2 W, no se probó. Los GPIO que la W
+reserva para el módulo (GP23 a GP25 y GP29) son internos y no salen a los
+pines.
 
 ## Modificación de la placa
 
 **Corte de la línea `/WAIT`.** Es el corte 2 de
-[CORRECCIONES.md](../../MSX-SDF-1/hardware/rev1/CORRECCIONES.md) del SDF-1: se
+[CORRECCIONES.md](https://github.com/carlosmsx/MSX-SDF-1/blob/main/hardware/rev1/CORRECCIONES.md) del SDF-1: se
 corta la pista que llega al contacto 7 del borde (`CON1-7`). El contacto queda
 sin conectar y el cartucho nunca pide espera.
 

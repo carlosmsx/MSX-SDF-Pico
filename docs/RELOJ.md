@@ -1,6 +1,6 @@
 # Reloj
 
-> **Estado:** firmware 0.6. Compila; sin probar en el MSX. La DiskROM no
+> **Estado:** firmware 0.6, probado en una Daewoo DPC-200. La DiskROM no
 > cambia: ya traía todo lo del reloj desde el SDF-1.
 
 El SDF-Pico le da al MSX un reloj sin chip de reloj. La hora se cuenta con el
