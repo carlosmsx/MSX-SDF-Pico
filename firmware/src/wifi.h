@@ -2,7 +2,7 @@
 //
 // La red (el driver y lwIP) corre en segundo plano, por interrupciones del
 // nucleo 0: el nucleo 1 y el bus no se enteran. Las credenciales se guardan
-// en el ultimo sector de la flash de la Pico, solo despues de conectar bien,
+// en el anteultimo sector de la flash de la Pico, solo despues de conectar bien,
 // y nunca se muestran: la consola y el menu informan la red, no la clave.
 //
 // Todo esto se llama solo desde el nucleo 0.

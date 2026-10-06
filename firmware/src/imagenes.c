@@ -296,6 +296,11 @@ uint8_t img_montar(uint8_t d, const char *n, uint8_t largo)
     return 0;
 }
 
+const char *img_nombre(uint8_t d)
+{
+    return d < NEW_DRIVE ? nombre[d] : "";
+}
+
 // Desmontar un drive que ya estaba vacio no es error.
 uint8_t img_desmontar(uint8_t d)
 {

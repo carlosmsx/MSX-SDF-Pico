@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PROTOCOL_VERSION  8   // el 7 del SDF-1, con registro de estado
-#define FW_VERSION        "SDF-Pico 0.8"
+#define FW_VERSION        "SDF-Pico 0.9"
 
 // Registro de estado, IN (01h). Ver docs/PROTOCOLO.md.
 #define EST_OCUPADO       0x80  // el firmware prepara la respuesta: no leer 00h
@@ -56,6 +56,7 @@
 #define CMD_SDFUMOUNT     0xE3
 #define CMD_SDFNEW        0xE4
 #define CMD_SDFDRIVES     0xE5
+#define CMD_SDFINFO       0xE6  // contesta drives, imagen de A: y de B: (ASCIIZ) (SDF.COM)
 
 // 0xFx: driver de disco de MSX-DOS
 #define CMD_WRITE         0xF0

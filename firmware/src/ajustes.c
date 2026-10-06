@@ -5,16 +5,20 @@
 #include "hardware/sync.h"
 #include "ajustes.h"
 
-// Ultimo sector de la flash (4 KB), lejos del programa, en dos paginas:
-// la red (el formato del firmware 0.4, para no perder la red guardada) y la
-// zona horaria. Cada una con su marca y su suma: una pagina borrada o vieja
-// vale lo de fabrica.
+// Anteultimo sector de la flash (4 KB), lejos del programa, en dos paginas:
+// la red (el formato del firmware 0.4) y la zona horaria. Cada una con su
+// marca y su suma: una pagina borrada o vieja vale lo de fabrica.
+//
+// No el ultimo: todo .uf2 para RP2350 empieza con un bloque en 0x10FFFF00
+// (la solucion del SDK a la errata RP2350-E10), el final de una flash de
+// 16 MB. En los 4 MB de la Pico 2 W las direcciones se repiten, ese bloque
+// cae en el ultimo sector y el bootrom lo borra en cada grabacion.
 //
 // Grabar sin detener al nucleo 1 es seguro porque todo el programa corre de
 // la RAM (copy_to_ram) y el nucleo 1 nunca lee la flash. Lo unico que queda
 // en la flash es el firmware del CYW43, y solo se lee al arrancar el Wi-Fi.
 
-#define OFFSET          (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
+#define OFFSET          (PICO_FLASH_SIZE_BYTES - 2 * FLASH_SECTOR_SIZE)
 #define MARCA_RED       0x49464957u     // "WIFI"
 #define MARCA_ZONA      0x414E4F5Au     // "ZONA"
 

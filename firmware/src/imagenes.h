@@ -39,6 +39,9 @@ uint8_t img_desmontar(uint8_t drive);
 uint8_t img_nueva(uint8_t media, const char *nombre, uint8_t largo,
                   uint8_t *ceros, uint32_t n_ceros, void (*avance)(void));
 
+// SDF.COM: la imagen montada en el drive, "" si no hay
+const char *img_nombre(uint8_t drive);
+
 // CALL SDFFILES: los .DSK de la raiz como ASCIIZ seguidos, y un nombre vacio
 // al final. Devuelve cuantos bytes escribio.
 uint32_t img_listar(uint8_t *buf, uint32_t max);

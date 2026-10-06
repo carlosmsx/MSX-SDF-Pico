@@ -1,8 +1,9 @@
-// Ajustes que sobreviven al apagado, en el ultimo sector de la flash de la
-// Pico: la red Wi-Fi y la zona horaria. Solo desde el nucleo 0.
+// Ajustes que sobreviven al apagado, en el anteultimo sector de la flash de
+// la Pico: la red Wi-Fi y la zona horaria. Solo desde el nucleo 0.
 //
-// Grabar un .uf2 no toca ese sector: los ajustes sobreviven a las
-// actualizaciones del firmware. La clave no se muestra nunca.
+// Grabar un .uf2 no toca ese sector (el ultimo si, ver ajustes.c): los
+// ajustes sobreviven a las actualizaciones del firmware. La clave no se
+// muestra nunca.
 
 #pragma once
 #include <stdbool.h>

@@ -41,6 +41,54 @@ encendido: el firmware reintenta cada medio segundo hasta que contesta.
 
 Un drive sin imagen contesta "Disk offline".
 
+## Desde MSX-DOS: `SDF.COM`
+
+Los mismos comandos, desde el DOS (MSX-DOS 1):
+
+| Comando | Qué hace |
+|---|---|
+| `SDF` | Versión del firmware, estado de la SD e imágenes de A: y B: |
+| `SDF DIR` | Lista las imágenes `.DSK` de la raíz, en columnas |
+| `SDF MOUNT d: X` | Monta `X.DSK` en `d:` (`A:` o `B:`) |
+| `SDF UMOUNT d:` | Deja `d:` sin imagen |
+| `SDF NEW X [360]` | Crea `X.DSK` vacía y formateada, de 720 KB o de 360 KB; no la monta |
+| `SDF DRIVES n` | Cantidad de unidades, 1 o 2, desde el próximo arranque |
+
+```
+B>SDF
+SDF-Pico 0.9
+SD ok
+A: SISTEMA.DSK
+B: JUEGOS.DSK
+B>SDF MOUNT B: DATOS
+B: DATOS.DSK
+```
+
+Después de `MOUNT` o `UMOUNT` el DOS se entera solo del cambio: el firmware
+contesta "cambiado" en el siguiente `DSKCHG` y el DOS relee la FAT.
+
+- Cambiar la imagen de A: funciona, pero MSX-DOS 1 recarga `COMMAND.COM`
+  cuando un programa grande pisa la memoria donde vive. Si la imagen nueva de
+  A: no lo tiene, puede pedir el disco del sistema.
+- `SDF NEW` formatea con un sector de arranque propio, de disco de datos:
+  el sector de arranque de `CALL SDFNEW` es del MSX-DOS kit de ASCII y no se
+  puede copiar en el programa. Si se arranca desde esa imagen, el MSX sigue
+  a BASIC.
+
+El fuente es `comandos/sdf.asm`; se ensambla con `python tools/comandos.py`.
+Para saber qué hay montado usa un comando que la DiskROM no necesita:
+
+```
+OUT (01h), CMD_SDFINFO          0E6h
+IN  (00h)               unidades que ve el DOS, 1 o 2
+IN  (00h) ... 0         imagen de A:, vacía si no hay
+IN  (00h) ... 0         imagen de B:, vacía si no hay
+```
+
+> **Estado:** probado en la DPC-200. Para probar cambios sin hardware,
+> `tools/webmsx_pico_sd.js` simula la Pico en WebMSX y guarda los sectores del
+> formateo para revisarlos.
+
 ## Lo que se recuerda
 
 Las imágenes montadas y la cantidad de drives se guardan en la propia tarjeta,

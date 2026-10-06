@@ -363,6 +363,14 @@ static void ejecutar(void)
     case CMD_SDFMOUNT:  resp[n++] = img_montar(par[0], (char *)par + 2, par[1]); break;
     case CMD_SDFUMOUNT: resp[n++] = img_desmontar(par[0]); break;
     case CMD_SDFDRIVES: resp[n++] = img_poner_drives(par[0]); break;
+    case CMD_SDFINFO:
+        // drives que ve el DOS, y las imagenes de A: y B: (vacias si no hay)
+        resp[n++] = img_drives();
+        for (int d = 0; d < 2; d++) {
+            strcpy((char *)resp + n, img_nombre(d));
+            n += strlen(img_nombre(d)) + 1;
+        }
+        break;
     case CMD_SDFNEW:
         nueva_aviso = make_timeout_time_ms(1000);
         resp[n++] = img_nueva(par[0], (char *)par + 2, par[1],

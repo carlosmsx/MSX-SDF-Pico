@@ -37,9 +37,16 @@ Con el Wi-Fi, la RAM usada pasa de ~222 KB a ~355 KB de 512 KB.
 
 ## Credenciales
 
-La red y la clave se guardan en el **último sector de la flash** (4 KB, en
-`PICO_FLASH_SIZE_BYTES - 4096`), con una suma de verificación. Grabar un
-`.uf2` no toca ese sector: las credenciales sobreviven a las actualizaciones.
+La red y la clave se guardan en el **anteúltimo sector de la flash** (4 KB,
+en `PICO_FLASH_SIZE_BYTES - 8192`), con una suma de verificación. Grabar un
+`.uf2` no toca ese sector: las credenciales sobreviven a las actualizaciones
+desde el firmware 0.9.
+
+Hasta el 0.8 estaban en el último sector, y cada grabación las borraba: todo
+`.uf2` para RP2350 empieza con un bloque dirigido a 0x10FFFF00 (la solución
+del pico-sdk a la errata RP2350-E10), el final de una flash de 16 MB. En los
+4 MB de la Pico 2 W las direcciones se repiten cada 4 MB, así que ese bloque
+cae en el último sector y el bootrom lo borra para escribirlo.
 La segunda página del sector guarda la zona horaria (`RELOJ.md`); las dos
 están en `firmware/src/ajustes.c`.
 

@@ -99,7 +99,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | Documento | Contenido |
 |---|---|
 | [hardware/CABLEADO.md](hardware/CABLEADO.md) | Modificación de la placa y cableado de la Pico |
-| [docs/SD.md](docs/SD.md) | La tarjeta, las imágenes y los `CALL SDF*` |
+| [docs/SD.md](docs/SD.md) | La tarjeta, las imágenes, los `CALL SDF*` y `SDF.COM` |
 | [docs/WIFI.md](docs/WIFI.md) | El Wi-Fi, `CALL WIFI`, `WIFI.COM` y la consola USB |
 | [docs/RELOJ.md](docs/RELOJ.md) | El reloj, la zona horaria y `OPEN "RTC:"` |
 | [docs/RED.md](docs/RED.md) | Conexión TCP para terminales (en desarrollo) |
@@ -112,7 +112,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | Carpeta | Contenido |
 |---|---|
 | `diskrom/` | DiskROM (Z80), derivada de la del SDF-1 |
-| `comandos/` | Programas de MSX-DOS: `PING.COM`, `WIFI.COM` y `GET.COM`, que usan la Pico, y `VI.COM` |
+| `comandos/` | Programas de MSX-DOS: `PING.COM`, `WIFI.COM`, `GET.COM` y `SDF.COM`, que usan la Pico, y `VI.COM` |
 | `hardware/` | Modificación de la placa del SDF-1 y cableado de la Pico |
 | `firmware/` | Firmware de la Pico, en C con el pico-sdk |
 | `docs/` | Documentación de cada función y del protocolo |
