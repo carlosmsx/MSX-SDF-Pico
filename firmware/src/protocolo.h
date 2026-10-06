@@ -35,6 +35,10 @@
 
 // 0xBx: red
 #define CMD_WIFIMENU      0xB0  // tecla, ancho, filas; contesta fin y texto (menu_wifi.h)
+#define CMD_NETCONN       0xB1  // puerto (L, H), largo, host; contesta 0 o error (red.h)
+#define CMD_NETIO         0xB2  // max, n, n bytes; contesta estado, m, m bytes (red.h)
+#define CMD_PINGSEND      0xB3  // largo, host; contesta 0 o error (ping.h)
+#define CMD_PINGPOLL      0xB4  // contesta estado, resultado, IP, tiempo, TTL: 9 bytes (ping.h)
 
 // 0xDx: diagnostico
 #define CMD_DEBUG         0xD0

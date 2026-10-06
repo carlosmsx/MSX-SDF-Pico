@@ -102,6 +102,8 @@ varios formatos. El detalle de cada función está en la documentación.
 | [docs/SD.md](docs/SD.md) | La tarjeta, las imágenes y los `CALL SDF*` |
 | [docs/WIFI.md](docs/WIFI.md) | El Wi-Fi, `CALL WIFI` y la consola USB |
 | [docs/RELOJ.md](docs/RELOJ.md) | El reloj, la zona horaria y `OPEN "RTC:"` |
+| [docs/RED.md](docs/RED.md) | Conexión TCP para terminales (en desarrollo) |
+| [docs/VI.md](docs/VI.md) | `VI.COM`, un editor al estilo de vi para MSX-DOS 1 |
 | [docs/PROTOCOLO.md](docs/PROTOCOLO.md) | Protocolo entre la DiskROM y el firmware |
 | [docs/PRUEBA-BUS.md](docs/PRUEBA-BUS.md) | Prueba del bus desde BASIC, sin DiskROM |
 
@@ -110,6 +112,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | Carpeta | Contenido |
 |---|---|
 | `diskrom/` | DiskROM (Z80), derivada de la del SDF-1 |
+| `comandos/` | Programas de MSX-DOS: `PING.COM`, que usa la Pico, y `VI.COM` |
 | `hardware/` | Modificación de la placa del SDF-1 y cableado de la Pico |
 | `firmware/` | Firmware de la Pico, en C con el pico-sdk |
 | `docs/` | Documentación de cada función y del protocolo |

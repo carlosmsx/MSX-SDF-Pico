@@ -21,7 +21,9 @@
 #include "dispositivos.h"
 #include "imagenes.h"
 #include "menu_wifi.h"
+#include "ping.h"
 #include "protocolo.h"
+#include "red.h"
 #include "reloj.h"
 #include "sd_spi.h"
 
@@ -48,6 +50,9 @@ static params_t params_de(uint8_t cmd)
     case CMD_DEVCLOSE:                  return (params_t){P_FIJO, 2};
     case CMD_DEVOUT:                    return (params_t){P_FIJO, 1};
     case CMD_WIFIMENU:                  return (params_t){P_FIJO, 3};
+    case CMD_NETCONN:                   return (params_t){P_NOMBRE, 2};
+    case CMD_NETIO:                     return (params_t){P_NOMBRE, 1};
+    case CMD_PINGSEND:                  return (params_t){P_NOMBRE, 0};
     default:                            return (params_t){P_FIJO, 0};
     }
 }
@@ -311,6 +316,34 @@ static void ejecutar(void)
         menu_pedir(par[0], par[1], par[2]);
         esperando_menu = true;
         return;
+
+    case CMD_NETCONN: {
+        char host[PAR_MAX];
+        uint32_t largo = par[2] < PAR_MAX - 3 ? par[2] : PAR_MAX - 3;
+        memcpy(host, par + 3, largo);
+        host[largo] = 0;
+        resp[n++] = red_conectar(host, par[0] | (par[1] << 8));
+        break;
+    }
+    case CMD_PINGSEND: {
+        char host[PAR_MAX];
+        uint32_t largo = par[0] < PAR_MAX - 1 ? par[0] : PAR_MAX - 1;
+        memcpy(host, par + 1, largo);
+        host[largo] = 0;
+        resp[n++] = ping_pedir(host);
+        break;
+    }
+    case CMD_PINGPOLL:  n = ping_leer(resp); break;
+    case CMD_NETIO: {
+        // estado, m, m bytes: el MSX los lee de una vez con INIR
+        static uint8_t red_out[2 + RED_MAX_RX];
+        uint32_t ntx = par[1] < RED_MAX_TX ? par[1] : RED_MAX_TX;
+        uint32_t max = par[0] < RED_MAX_RX ? par[0] : RED_MAX_RX;
+        uint32_t m = red_io(par + 2, ntx, red_out + 2, max, &red_out[0]);
+        red_out[1] = m;
+        bus_tx_enviar(red_out, 2 + m);
+        break;
+    }
 
     case CMD_SDFFILES:
         bus_tx_enviar(io_buf, img_listar(io_buf, sizeof io_buf));

@@ -18,6 +18,8 @@
 #include "bus.h"
 #include "consola.h"
 #include "protocolo.h"
+#include "ping.h"
+#include "red.h"
 #include "ajustes.h"
 #include "menu_wifi.h"
 #include "reloj.h"
@@ -59,7 +61,7 @@ static bool leer_zona(const char *txt, int *minutos)
 
 static void comando(const char *linea)
 {
-    if (linea[0] == 0 || wifi_comando(linea))
+    if (linea[0] == 0 || wifi_comando(linea) || red_comando(linea))
         return;
     if (strcmp(linea, "hora") == 0) {
         mostrar_hora();
@@ -84,6 +86,8 @@ static void comando(const char *linea)
            "  conectar <n>  conecta a la red n de la lista (o por nombre);\n"
            "                pide la clave y, si conecta, la guarda\n"
            "  olvidar       borra la red guardada\n"
+           "  tcp <host> <puerto>  abre la conexion que usa el MSX (RetroTerm);\n"
+           "                tcp cerrar, tcp baudios N, tcp traza, tcp: estado\n"
            "  hora          fecha, hora y de donde salio\n"
            "  zona <h>      zona horaria: zona -3, zona +5:30\n");
 }
@@ -104,6 +108,8 @@ int main(void)
         bus_diagnostico();
         wifi_tarea();
         menu_tarea();
+        red_tarea();
+        ping_tarea();
         const char *linea = consola_linea(wifi_pide_clave());
         if (linea)
             comando(linea);
