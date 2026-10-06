@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PROTOCOL_VERSION  8   // el 7 del SDF-1, con registro de estado
-#define FW_VERSION        "SDF-Pico 0.6"
+#define FW_VERSION        "SDF-Pico 0.7"
 
 // Registro de estado, IN (01h). Ver docs/PROTOCOLO.md.
 #define EST_OCUPADO       0x80  // el firmware prepara la respuesta: no leer 00h
@@ -39,6 +39,10 @@
 #define CMD_NETIO         0xB2  // max, n, n bytes; contesta estado, m, m bytes (red.h)
 #define CMD_PINGSEND      0xB3  // largo, host; contesta 0 o error (ping.h)
 #define CMD_PINGPOLL      0xB4  // contesta estado, resultado, IP, tiempo, TTL: 9 bytes (ping.h)
+#define CMD_WIFISTAT      0xB5  // contesta estado, resultado, senal, red, IP, motivo (wifi_dos.h)
+#define CMD_WIFISCAN      0xB6  // empieza a buscar redes; contesta 0 o error (wifi_dos.h)
+#define CMD_WIFIREDES     0xB7  // contesta buscando, n, n redes (wifi_dos.h)
+#define CMD_WIFIJOIN      0xB8  // largo, red, largo, clave; contesta 0 o error (wifi_dos.h)
 
 // 0xDx: diagnostico
 #define CMD_DEBUG         0xD0

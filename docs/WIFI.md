@@ -98,6 +98,86 @@ El menú lo arma el firmware y la ROM solo lo muestra (ver `CMD_WIFIMENU` en
 `PROTOCOLO.md`). Cambiar el menú es cambiar el firmware, sin regrabar la
 EEPROM.
 
+## `WIFI.COM`
+
+Lo mismo que `CALL WIFI`, desde MSX-DOS 1 y en modo texto. Busca las redes,
+las lista numeradas y pregunta a cuál conectarse:
+
+```
+B>WIFI
+Sin conexion a Casa
+Buscando redes...
+ 1  -48 dBm  Casa (guardada)
+ 2  -71 dBm  Vecino
+ 3  -80 dBm  Bar (abierta)
+Red (1-3, RETURN sale): 2
+Clave (ESC vuelve): *********
+Conectando a Vecino...
+Conectado. IP 192.168.0.37
+La red quedo guardada.
+```
+
+- `WIFI /S` solo muestra el estado: la red, la IP y la señal.
+- `RETURN` sin número sale sin cambiar nada.
+- Una red abierta conecta sin pedir clave. En la clave, `BS` borra y `ESC`
+  vuelve a la pregunta de la red.
+- Si conecta, la red queda guardada, igual que con `CALL WIFI`. Si no,
+  muestra el motivo y la Pico sigue con la red anterior.
+- Las letras que no son ASCII del nombre de una red (UTF-8) se ven como `?`.
+
+El fuente es `comandos/wifi.asm` y se ensambla con PASMO
+(`pasmo wifi.asm wifi.com`). El programa arma la pantalla y la Pico hace el
+resto con cuatro comandos (`firmware/src/wifi_dos.c`). Como `CMD_WIFIMENU`,
+los atiende el núcleo 0: el núcleo 1 deja `OCUPADO` hasta la respuesta.
+
+> **Estado:** probado en la DPC-200 con una red WPA2 (estado, lista, clave
+> incorrecta y conexión). Falta probar una red abierta. Para probar cambios
+> sin hardware, `tools/webmsx_pico_wifi.js` simula la Pico en WebMSX.
+
+### `CMD_WIFISTAT` (0B5h)
+
+```
+OUT (01h), CMD_WIFISTAT
+IN  (00h)               estado: 0 apagado, 1 sin red, 2 conectando, 3 conectado, 4 en espera
+IN  (00h)               ultima conexion pedida: 0 en curso, 1 conecto, 2 fallo
+IN  (00h)               senal en dBm, con signo (0 si no esta conectado)
+IN  (00h) ... 0         red: la que se usa o, si no hay, la guardada
+IN  (00h) ... 0         IP, en texto (vacia si no esta conectado)
+IN  (00h) ... 0         motivo del fallo (vacio si no fallo)
+```
+
+### `CMD_WIFISCAN` (0B6h)
+
+```
+OUT (01h), CMD_WIFISCAN
+IN  (00h)               0 = buscando, 1 = el Wi-Fi no responde, 2 = no se pudo empezar
+```
+
+### `CMD_WIFIREDES` (0B7h)
+
+```
+OUT (01h), CMD_WIFIREDES
+IN  (00h)               1 = todavia buscando (n = 0), 0 = lista
+IN  (00h)               n, cantidad de redes (hasta 16), ordenadas por senal
+por cada red:
+IN  (00h)               senal en dBm, con signo
+IN  (00h)               marcas: bit 0 = abierta, bit 1 = es la guardada
+IN  (00h) ... 0         nombre
+```
+
+### `CMD_WIFIJOIN` (0B8h)
+
+```
+OUT (01h), CMD_WIFIJOIN
+OUT (00h), largo, nombre x largo        1 a 32
+OUT (00h), largo, clave x largo         0 (red abierta) u 8 a 63
+IN  (00h)               0 = conectando, 1 = el Wi-Fi no responde, 2 = nombre o clave no validos
+```
+
+El resultado se consulta con `CMD_WIFISTAT` hasta que el segundo byte deja de
+ser 0. La Pico da la conexión por fallida a los 30 s. Firmware y programa
+borran la clave de la memoria después de usarla.
+
 ## Consola USB
 
 | Comando | Acción |

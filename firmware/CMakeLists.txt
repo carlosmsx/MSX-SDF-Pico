@@ -20,6 +20,7 @@ set(FUENTES
     src/consola.c
     src/wifi.c
     src/menu_wifi.c
+    src/wifi_dos.c
     src/red.c
     src/ping.c
     src/ajustes.c

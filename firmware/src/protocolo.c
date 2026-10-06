@@ -26,14 +26,16 @@
 #include "red.h"
 #include "reloj.h"
 #include "sd_spi.h"
+#include "wifi_dos.h"
 
 // ---- Parametros de cada comando ----
 
-enum { P_FIJO, P_NOMBRE, P_ASCIIZ };
+enum { P_FIJO, P_NOMBRE, P_ASCIIZ, P_DOBLE };
 
 typedef struct {
     uint8_t tipo;
     uint8_t n;      // P_FIJO: cuantos; P_NOMBRE: fijos antes del largo
+                    // P_DOBLE: dos textos con su largo, sin fijos
 } params_t;
 
 static params_t params_de(uint8_t cmd)
@@ -53,6 +55,7 @@ static params_t params_de(uint8_t cmd)
     case CMD_NETCONN:                   return (params_t){P_NOMBRE, 2};
     case CMD_NETIO:                     return (params_t){P_NOMBRE, 1};
     case CMD_PINGSEND:                  return (params_t){P_NOMBRE, 0};
+    case CMD_WIFIJOIN:                  return (params_t){P_DOBLE, 0};
     default:                            return (params_t){P_FIJO, 0};
     }
 }
@@ -61,7 +64,7 @@ static params_t params_de(uint8_t cmd)
 
 enum { E_LIBRE, E_PARAMS, E_DATOS, E_ECO };
 
-#define PAR_MAX     64
+#define PAR_MAX     100     // CMD_WIFIJOIN: 1 + 32 + 1 + 63
 #define IO_SECTORES 255     // lo maximo que pide un DSKIO
 
 static int etapa = E_LIBRE;
@@ -84,8 +87,8 @@ static uint32_t esc_sector, esc_total, esc_n;
 
 static uint8_t contador[256];
 
-// CMD_WIFIMENU: la respuesta la arma el nucleo 0
-static bool esperando_menu;
+// CMD_WIFIMENU y los de WIFI.COM: la respuesta la arma el nucleo 0
+static bool esperando_menu, esperando_wdos;
 
 static struct {
     uint32_t lecturas, escrituras, sectores_leidos, sectores_escritos;
@@ -127,6 +130,8 @@ static bool params_completos(void)
     case P_FIJO:   return npar >= p.n;
     case P_NOMBRE: return npar > p.n && npar >= p.n + 1 + par[p.n];
     case P_ASCIIZ: return npar > 0 && par[npar - 1] == 0;
+    case P_DOBLE:  return npar > 0 && npar > 1 + par[0]
+                          && npar >= 2 + par[0] + par[1 + par[0]];
     }
     return true;
 }
@@ -334,6 +339,13 @@ static void ejecutar(void)
         break;
     }
     case CMD_PINGPOLL:  n = ping_leer(resp); break;
+
+    case CMD_WIFISTAT: case CMD_WIFISCAN: case CMD_WIFIREDES: case CMD_WIFIJOIN:
+        // OCUPADO hasta que el nucleo 0 conteste (esperar_nucleo0)
+        wdos_pedir(cmd, par, npar);
+        memset(par, 0, sizeof par);     // la clave de CMD_WIFIJOIN
+        esperando_wdos = true;
+        return;
     case CMD_NETIO: {
         // estado, m, m bytes: el MSX los lee de una vez con INIR
         static uint8_t red_out[2 + RED_MAX_RX];
@@ -394,6 +406,7 @@ static void comando(uint8_t c)
                        (unsigned long)(esc_total - esc_n));
         lec_quedan = 0;
         esperando_menu = false;
+        esperando_wdos = false;
     }
     cmd = c;
     npar = 0;
@@ -454,15 +467,21 @@ static void iniciar_sd(bool siempre)
     }
 }
 
-static void esperar_menu(void)
+static void esperar_nucleo0(void)
 {
     const uint8_t *datos;
-    if (!esperando_menu)
+    int n;
+    if (esperando_menu) {
+        if ((n = menu_respuesta(&datos)) < 0)
+            return;
+        esperando_menu = false;
+    } else if (esperando_wdos) {
+        if ((n = wdos_respuesta(&datos)) < 0)
+            return;
+        esperando_wdos = false;
+    } else {
         return;
-    int n = menu_respuesta(&datos);
-    if (n < 0)
-        return;
-    esperando_menu = false;
+    }
     bus_tx_enviar(datos, n);
     soltar();
 }
@@ -498,6 +517,7 @@ void protocolo_core1(void)
         etapa = E_LIBRE;
         error_st = false;
         esperando_menu = false;
+        esperando_wdos = false;
 
         // La SD, con el estado todavia en OCUPADO: la ROM espera, y asi su
         // primer DRIVES ya recibe lo que dice la configuracion. Antes, un
@@ -515,7 +535,7 @@ void protocolo_core1(void)
                 else
                     dato(b);
             }
-            esperar_menu();
+            esperar_nucleo0();
             if (libre && !bus_rx_hay())
                 publicar(EST_FIJO | (error_st ? EST_ERROR : 0));
             tarea_sd();

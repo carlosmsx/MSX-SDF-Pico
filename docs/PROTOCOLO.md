@@ -154,6 +154,10 @@ La respuesta la arma el núcleo 0, donde está el Wi-Fi. El núcleo 1 levanta
 `OCUPADO` como en cualquier comando, le pasa el pedido y lo baja cuando el
 núcleo 0 contesta, normalmente en menos de un milisegundo.
 
+Los comandos de `WIFI.COM` (0B5h a 0B8h, en `WIFI.md`) siguen el mismo camino
+por el núcleo 0. `CMD_WIFIJOIN` lleva dos textos con su largo (la red y la
+clave), así que los parámetros de un comando pueden llegar a 100 bytes.
+
 ## Condición de carrera al enviar un comando
 
 `OCUPADO` tiene que estar en 1 antes de que el Z80 pueda consultar el estado
