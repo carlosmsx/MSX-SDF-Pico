@@ -112,7 +112,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | Carpeta | Contenido |
 |---|---|
 | `diskrom/` | DiskROM (Z80), derivada de la del SDF-1 |
-| `comandos/` | Programas de MSX-DOS: `PING.COM` y `WIFI.COM`, que usan la Pico, y `VI.COM` |
+| `comandos/` | Programas de MSX-DOS: `PING.COM`, `WIFI.COM` y `GET.COM`, que usan la Pico, y `VI.COM` |
 | `hardware/` | Modificación de la placa del SDF-1 y cableado de la Pico |
 | `firmware/` | Firmware de la Pico, en C con el pico-sdk |
 | `docs/` | Documentación de cada función y del protocolo |
@@ -129,8 +129,16 @@ cd firmware
 ```
 
 El resultado es `firmware/build/sdf_pico.uf2`, que se copia a la Pico
-conectada en modo BOOTSEL. Actualizar el firmware no borra la red ni la zona
+conectada en modo BOOTSEL. `python firmware/grabar.py` lo hace sin el botón:
+reinicia la Pico en BOOTSEL abriendo su consola USB a 1200 baudios y copia el
+archivo (requiere pyserial). Actualizar el firmware no borra la red ni la zona
 horaria guardadas.
+
+Los programas de MSX-DOS de `comandos/` se ensamblan con
+`python tools/comandos.py` (PASMO), que los deja en `out/msx/` y arma
+`out/comandos.dsk`. Con `out/msx/` servida en la red
+(`python -m http.server 8000 --bind 0.0.0.0 --directory out/msx`), se bajan
+desde el MSX con `GET.COM`.
 
 ## Compilación de la DiskROM
 

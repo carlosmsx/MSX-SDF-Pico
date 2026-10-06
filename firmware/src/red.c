@@ -14,7 +14,7 @@
 #define TX_TAM      2048
 #define MSG_TAM     512     // potencia de 2: respuestas del modem
 #define HOST_MAX    63
-#define RAFAGA      RED_MAX_RX  // lo maximo que se junta sin que el MSX pregunte
+#define RAFAGA      120     // lo maximo que se junta sin que el MSX pregunte (el bufer de RetroTerm)
 #define CONECTAR_MS 15000
 
 #define BAUDIOS_INI 57600   // la velocidad de linea de los servidores Turbo56K
@@ -52,7 +52,8 @@ static volatile uint32_t pedido, atendido;
 
 static volatile uint8_t estado;         // RED_*, lo escribe el nucleo 0
 static volatile uint32_t rx_inicio;     // nucleo 0: lo anterior a esto es de un socket viejo
-static bool via_at;                     // la conexion la pidio el MSX con atd: hay CONNECT y NO CARRIER
+static volatile bool via_at;            // la conexion la pidio el MSX con atd: hay CONNECT y NO CARRIER,
+                                        // y lo recibido sale dosificado
 
 static volatile uint32_t baudios = BAUDIOS_INI;
 
@@ -117,12 +118,16 @@ uint8_t red_conectar(const char *host, uint16_t puerto)
 
 // Bytes que la linea habria entregado desde la ultima vez, como un balde:
 // hasta RAFAGA acumulados. Los servidores Turbo56K mandan el audio a la
-// velocidad del modem y la ROM lo reproduce a medida que llega.
+// velocidad del modem y la ROM lo reproduce a medida que llega. Solo con
+// las conexiones de atd (RetroTerm): las de CMD_NETCONN (GET.COM) van a
+// toda velocidad.
 static uint32_t balde, fraccion;
 
 static uint32_t fichas(void)
 {
     static uint32_t ultimo;
+    if (!via_at)
+        return RED_MAX_RX;
     uint32_t ahora = time_us_32();
     uint32_t dt = ahora - ultimo;
     ultimo = ahora;
@@ -184,7 +189,7 @@ uint32_t red_io(const uint8_t *tx, uint32_t n, uint8_t *out, uint32_t max,
             nc_entregados++;
         }
     }
-    balde -= m;
+    balde = m < balde ? balde - m : 0;
 
     uint8_t e = estado;
     if (pedido != atendido)

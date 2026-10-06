@@ -19,9 +19,10 @@
 #define RED_OK          0
 #define RED_NOMBRE_MAL  2
 
-// CMD_NETIO entrega hasta RED_MAX_RX bytes por llamada y recibe hasta
-// RED_MAX_TX (lo que entra en los parametros del protocolo).
-#define RED_MAX_RX      120
+// CMD_NETIO entrega hasta RED_MAX_RX bytes por llamada (lo que entra en el
+// byte del largo) y recibe hasta RED_MAX_TX (lo que entra en los parametros
+// del protocolo).
+#define RED_MAX_RX      255
 #define RED_MAX_TX      60
 
 // ---- Nucleo 1 ----

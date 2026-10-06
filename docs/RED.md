@@ -65,7 +65,7 @@ IN  (00h) x m           los bytes recibidos
 ```
 
 Una sola llamada envía y recibe. Límites por llamada: 60 bytes enviados
-(`RED_MAX_TX`) y 120 recibidos (`RED_MAX_RX`). No cambia de modo ni toca el
+(`RED_MAX_TX`) y 255 recibidos (`RED_MAX_RX`). No cambia de modo ni toca el
 disco, así que se puede intercalar con cualquier otro comando, por ejemplo las
 llamadas al DOS de una descarga.
 
@@ -81,8 +81,10 @@ Después de `CORTADA` se pueden seguir leyendo los bytes que quedaban.
 
 Los servidores Turbo56K mandan el audio a la velocidad de línea del módem, y
 el MSX lo reproduce a medida que llega. Si la Pico entregara todo de golpe,
-el audio sonaría acelerado. `CMD_NETIO` entrega como máximo lo que habría
-entregado una línea a `baudios` (balde de 120 bytes), no más.
+el audio sonaría acelerado. Por eso, en las conexiones abiertas con `atd`,
+`CMD_NETIO` entrega como máximo lo que habría entregado una línea a
+`baudios` (balde de 120 bytes), no más. Las conexiones de `CMD_NETCONN` o
+de la consola (las de `GET.COM`) entregan a toda velocidad.
 
 ## Memoria
 
@@ -151,3 +153,39 @@ IN  (00h) x 9           estado, resultado, IP (4), tiempo en ms (L, H), TTL
 La IP es la del que contestó, con el primer octeto primero. El tiempo se
 redondea al milisegundo: en una red local suele salir 0, y PING lo muestra como
 `<1 ms`.
+
+## GET.COM
+
+`GET http://host[:puerto]/ruta [archivo]` (MSX-DOS 1) baja un archivo por
+HTTP/1.0 y lo graba en el disco. El fuente es `comandos/get.asm`; se ensambla
+con PASMO (`pasmo get.asm get.com`).
+
+```
+B>GET http://192.168.0.10:8000/JUEGO.ROM
+Conectando a 192.168.0.10...
+32768 bytes de 32768
+Grabado en JUEGO.ROM, en 2,1 s
+```
+
+- Sin archivo, el nombre sale del final de la ruta (hasta el `?`), pasado a
+  8.3 y a mayúsculas; `INDEX.HTM` si la ruta termina en `/`. Con solo una
+  unidad (`GET url B:`), graba en esa unidad con ese nombre.
+- Si el archivo ya existe, pregunta antes de reemplazarlo.
+- Si el servidor manda `Content-Length` y el archivo no entra en el disco
+  (contando el lugar que libera el que se reemplaza), avisa y no toca nada.
+- Una respuesta que no es 200 se muestra tal cual, con el destino si es una
+  redirección (no la sigue).
+- `ESC` corta la descarga. Si se corta, si el disco se llena o si llegan
+  menos bytes que los anunciados, se borra el archivo a medias.
+- Sin HTTPS: la Pico no tiene TLS.
+
+Para pasar archivos desde la PC alcanza con un servidor web en la carpeta,
+por ejemplo `python -m http.server 8000`.
+
+Usa `CMD_NETCONN` y `CMD_NETIO`, sin comandos nuevos: el pedido sale de a
+60 bytes y la respuesta llega de a 255. El cuerpo se junta en un búfer de
+8 KB y se graba con la escritura al azar en bloque del DOS (función 26h).
+
+> **Estado:** probado en la DPC-200 bajando los programas de `out/msx/`.
+> Para probar cambios sin hardware, `tools/webmsx_pico_red.js` simula la Pico
+> en WebMSX y lee el disco emulado para comparar lo grabado.
