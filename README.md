@@ -119,6 +119,43 @@ varios formatos. El detalle de cada función está en la documentación.
 | `docs/` | Documentación de cada función y del protocolo |
 | `tools/` | Armado de la ROM (`mkrom.py`, `patch_rtc_kernel.py`) |
 
+## Herramientas
+
+La compilación se probó en Windows 11 con estas versiones. Ninguna herramienta
+se incluye en el repositorio.
+
+| Herramienta | Versión | Para qué | Dónde |
+|---|---|---|---|
+| Extensión *Raspberry Pi Pico* de VS Code | — | Firmware | [Marketplace](https://marketplace.visualstudio.com/items?itemName=raspberry-pi.raspberry-pi-pico) |
+| pico-sdk | 2.3.0 | Firmware | Lo instala la extensión |
+| GCC para ARM | 14.2 (`14_2_Rel1`) | Firmware | Lo instala la extensión |
+| CMake | 3.31.5 | Firmware | Lo instala la extensión |
+| Ninja | 1.12.1 | Firmware | Lo instala la extensión |
+| picotool y pioasm | 2.3.0 | Firmware | Lo instala la extensión |
+| Python | 3 | ROM, programas de DOS, `grabar.py` | [python.org](https://www.python.org/downloads/) |
+| pyserial | — | Solo `firmware/grabar.py` | `pip install pyserial` |
+| GNU make | 4.4.1 | DiskROM | En Windows, por ejemplo `scoop install make` ([Scoop](https://scoop.sh/)) |
+| Nestor80 (N80 y LK80) | N80 1.3.6, LK80 1.1.1 | DiskROM | [Releases de Nestor80](https://github.com/Konamiman/Nestor80/releases) |
+| .NET | 6 | Nestor80 | [dotnet.microsoft.com](https://dotnet.microsoft.com/download/dotnet/6.0) |
+| PASMO | 0.5.5 | Programas de DOS | [pasmo.speccy.org](https://pasmo.speccy.org/) |
+| MSX-DOS kit de ASCII | 1984-85 | DiskROM | No se distribuye (ver abajo) |
+
+`build.ps1` busca cada herramienta del firmware en `~/.pico-sdk` con la versión
+exacta de la tabla. Para que la extensión las instale, se importa la carpeta
+`firmware/` como proyecto eligiendo el SDK 2.3.0.
+
+Los ejecutables `N80.exe` y `LK80.exe` van en `tools/bin/`. La variante
+*framework-dependent* de Nestor80 requiere el runtime de .NET 6. La variante
+*self-contained* no lo requiere.
+
+PASMO se busca en el `PATH`, en la variable de entorno `PASMO` o con
+`python tools/comandos.py --pasmo RUTA`.
+
+Del MSX-DOS kit, la DiskROM usa `DOSHEAD.REL`, `BIOS.REL`, `MSXDOS.REL`,
+`SMLDISP.REL`, `INIT.REL`, `DSKBASIC.REL`, `MSXDATA.REL`, `BASDATA.REL` y
+`BOOT.Z80`, que van en `build/`. `make check` verifica que estén Nestor80 y
+el kit.
+
 ## Compilación del firmware
 
 Se requiere la extensión *Raspberry Pi Pico* de VS Code, que instala el SDK y
