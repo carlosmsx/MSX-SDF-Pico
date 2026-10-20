@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
+#include "archivos.h"
 #include "bus.h"
 #include "consola.h"
 #include "dispositivos.h"
@@ -56,15 +57,21 @@ static params_t params_de(uint8_t cmd)
     case CMD_NETIO:                     return (params_t){P_NOMBRE, 1};
     case CMD_PINGSEND:                  return (params_t){P_NOMBRE, 0};
     case CMD_WIFIJOIN:                  return (params_t){P_DOBLE, 0};
+    case CMD_FSCD: case CMD_FSDEL: case CMD_FSMKDIR: case CMD_FSSTAT:
+                                        return (params_t){P_NOMBRE, 0};
+    case CMD_FSDIR: case CMD_FSOPEN:    return (params_t){P_NOMBRE, 1};
+    case CMD_FSLIST:                    return (params_t){P_FIJO, 3};
+    case CMD_FSREAD: case CMD_FSWRITE:  return (params_t){P_FIJO, 2};
+    case CMD_FSREN:                     return (params_t){P_DOBLE, 0};
     default:                            return (params_t){P_FIJO, 0};
     }
 }
 
 // ---- Estado de la transaccion ----
 
-enum { E_LIBRE, E_PARAMS, E_DATOS, E_ECO };
+enum { E_LIBRE, E_PARAMS, E_DATOS, E_FSDATOS, E_ECO };
 
-#define PAR_MAX     100     // CMD_WIFIJOIN: 1 + 32 + 1 + 63
+#define PAR_MAX     260     // CMD_FSREN: dos rutas de hasta FS_RUTA_MAX
 #define IO_SECTORES 255     // lo maximo que pide un DSKIO
 
 static int etapa = E_LIBRE;
@@ -86,6 +93,10 @@ static uint8_t esc_drive;
 static uint32_t esc_sector, esc_total, esc_n;
 
 static uint8_t contador[256];
+
+// Archivos de la SD: lo que va y viene por FSREAD, FSWRITE y FSLIST
+static uint8_t fs_buf[3 + FS_BLOQUE];
+static uint32_t fs_n, fs_total;
 
 // CMD_WIFIMENU y los de WIFI.COM: la respuesta la arma el nucleo 0
 static bool esperando_menu, esperando_wdos;
@@ -214,6 +225,55 @@ static void dato_de_escritura(uint8_t b)
         st.sectores_escritos += esc_total / SECTOR;
         etapa = E_LIBRE;
     }
+    soltar();
+}
+
+// ---- Archivos de la SD (archivos.c) ----
+
+static int con_largo(uint8_t err, uint32_t v, uint8_t *r)
+{
+    r[0] = err;
+    r[1] = v;
+    r[2] = v >> 8;
+    r[3] = v >> 16;
+    r[4] = v >> 24;
+    return 5;
+}
+
+static void cmd_fsread(void)
+{
+    uint32_t max = par[0] | (par[1] << 8), n;
+    if (max > FS_BLOQUE)
+        max = FS_BLOQUE;
+    fs_buf[0] = fs_leer(fs_buf + 3, max, &n);
+    fs_buf[1] = n;
+    fs_buf[2] = n >> 8;
+    bus_tx_enviar(fs_buf, 3 + n);
+}
+
+// Los n bytes llegan despues de los parametros: OCUPADO sigue arriba hasta
+// grabarlos, y entonces sale el error. Si son de mas, se descartan.
+static void cmd_fswrite(void)
+{
+    fs_total = par[0] | (par[1] << 8);
+    fs_n = 0;
+    if (fs_total == 0) {
+        bus_tx_byte(fs_escribir(fs_buf, 0));
+        soltar();
+        return;
+    }
+    etapa = E_FSDATOS;
+}
+
+static void dato_de_fswrite(uint8_t b)
+{
+    if (fs_n < FS_BLOQUE)
+        fs_buf[fs_n] = b;
+    if (++fs_n < fs_total)
+        return;
+    etapa = E_LIBRE;
+    bus_tx_byte(fs_total > FS_BLOQUE ? ERR_ILLEGAL_FUNCTION
+                                     : fs_escribir(fs_buf, fs_total));
     soltar();
 }
 
@@ -357,6 +417,53 @@ static void ejecutar(void)
         break;
     }
 
+    case CMD_FSCD:      resp[n++] = fs_cd((char *)par + 1, par[0]); break;
+    case CMD_FSPWD:     bus_tx_enviar(io_buf, fs_pwd((char *)io_buf)); break;
+    case CMD_FSDIR: {
+        uint16_t cant;
+        bool cortado;
+        resp[n++] = fs_dir(par[0], (char *)par + 2, par[1], &cant, &cortado);
+        resp[n++] = cant;
+        resp[n++] = cant >> 8;
+        resp[n++] = cortado;
+        break;
+    }
+    case CMD_FSLIST: {
+        int max = par[2] < FS_LISTA_MAX ? par[2] : FS_LISTA_MAX;
+        int m = fs_listar(par[0] | (par[1] << 8), max, io_buf + 1);
+        io_buf[0] = m;
+        bus_tx_enviar(io_buf, 1 + m * FS_ENTRADA);
+        break;
+    }
+    case CMD_FSOPEN: {
+        uint32_t tam;
+        uint8_t err = fs_abrir(par[0], (char *)par + 2, par[1], &tam);
+        n = con_largo(err, tam, resp);
+        break;
+    }
+    case CMD_FSREAD:    cmd_fsread(); break;
+    case CMD_FSWRITE:   cmd_fswrite(); return;
+    case CMD_FSCLOSE:   resp[n++] = fs_cerrar(); break;
+    case CMD_FSDEL:     resp[n++] = fs_borrar((char *)par + 1, par[0]); break;
+    case CMD_FSMKDIR:   resp[n++] = fs_mkdir((char *)par + 1, par[0]); break;
+    case CMD_FSREN:
+        resp[n++] = fs_renombrar((char *)par + 1, par[0],
+                                 (char *)par + 2 + par[0], par[1 + par[0]]);
+        break;
+    case CMD_FSSTAT:
+        resp[n++] = fs_stat((char *)par + 1, par[0], resp + 1);
+        n += FS_ENTRADA;
+        break;
+    case CMD_FSFREE: {
+        uint32_t libres, total;
+        n = con_largo(fs_libre(&libres, &total), libres, resp);
+        resp[n++] = total;
+        resp[n++] = total >> 8;
+        resp[n++] = total >> 16;
+        resp[n++] = total >> 24;
+        break;
+    }
+
     case CMD_SDFFILES:
         bus_tx_enviar(io_buf, img_listar(io_buf, sizeof io_buf));
         break;
@@ -394,7 +501,14 @@ static void ejecutar(void)
     case CMD_ECO:       etapa = E_ECO; break;
     case CMD_CONTADOR:  bus_tx_enviar(contador, sizeof contador); break;
 
-    default:            break;  // INIHRD, INIENV, MTOFF, GETDPB...: sin respuesta
+    // Lo primero que manda la DiskROM despues de cada reset: lo que haya
+    // quedado de antes (un archivo abierto, una conexion) no vale.
+    case CMD_INIHRD:
+        fs_reiniciar();
+        red_conectar("", 0);
+        break;
+
+    default:            break;  // INIENV, MTOFF, GETDPB...: sin respuesta
     }
 
     if (n)
@@ -439,6 +553,9 @@ static void dato(uint8_t b)
         break;
     case E_DATOS:
         dato_de_escritura(b);
+        break;
+    case E_FSDATOS:
+        dato_de_fswrite(b);
         break;
     case E_ECO:
         bus_tx_byte(b);

@@ -16,6 +16,7 @@ set(FUENTES
     src/bus.c
     src/protocolo.c
     src/imagenes.c
+    src/archivos.c
     src/sd_spi.c
     src/consola.c
     src/wifi.c
@@ -27,6 +28,7 @@ set(FUENTES
     src/reloj.c
     src/dispositivos.c
     lib/fatfs/ff.c
+    lib/fatfs/ffunicode.c
 )
 # src/disco.c (el disco en la flash de la Pico, docs/DISCO-FLASH.md) quedo
 # fuera de la compilacion: fue el respaldo de prueba antes de la SD.
@@ -35,6 +37,8 @@ set(FUENTES
 #   sdf_pico          el firmware
 #   sdf_pico_escucha  la Pico nunca maneja el bus (para probar el cableado)
 #   sdf_pico_diag     ademas, latido por segundo y espia de 8 fotos por acceso
+# Las dos de prueba solo se compilan con -DSDF_VARIANTES=ON.
+option(SDF_VARIANTES "Compilar tambien sdf_pico_escucha y sdf_pico_diag" OFF)
 function(firmware nombre)
     add_executable(${nombre} ${FUENTES})
     pico_generate_pio_header(${nombre} ${CMAKE_CURRENT_LIST_DIR}/src/bus.pio)
@@ -58,7 +62,9 @@ function(firmware nombre)
 endfunction()
 
 firmware(sdf_pico)
-firmware(sdf_pico_escucha)
-firmware(sdf_pico_diag)
-target_compile_definitions(sdf_pico_escucha PRIVATE SOLO_ESCUCHA=1)
-target_compile_definitions(sdf_pico_diag PRIVATE SOLO_ESCUCHA=1 DIAGNOSTICO=1)
+if(SDF_VARIANTES)
+    firmware(sdf_pico_escucha)
+    firmware(sdf_pico_diag)
+    target_compile_definitions(sdf_pico_escucha PRIVATE SOLO_ESCUCHA=1)
+    target_compile_definitions(sdf_pico_diag PRIVATE SOLO_ESCUCHA=1 DIAGNOSTICO=1)
+endif()

@@ -1,13 +1,14 @@
 // Imagenes .DSK de la tarjeta SD, montadas en A: y B:.
 //
 // Mismo comportamiento que el firmware del SDF-1: imagenes de 720 o 360 KB en
-// la raiz de la SD, por su nombre corto 8.3; CALL SDFMOUNT/SDFUMOUNT las
+// la raiz de la SD, por su nombre corto 8.3 (aunque FatFs ve los largos); CALL SDFMOUNT/SDFUMOUNT las
 // cambian y CALL SDFNEW crea una. Lo montado y la cantidad de drives se
 // guardan en la SD (SDFPICO.CFG), en lugar de la EEPROM del ATmega.
 
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
+#include "ff.h"
 
 #define SECTOR          512
 #define NEW_DRIVE       2       // la imagen recien creada por CALL SDFNEW
@@ -41,6 +42,20 @@ uint8_t img_nueva(uint8_t media, const char *nombre, uint8_t largo,
 
 // SDF.COM: la imagen montada en el drive, "" si no hay
 const char *img_nombre(uint8_t drive);
+
+// Para archivos.c: true si la imagen de ese nombre corto esta montada (o es
+// la de CALL SDFNEW). Las imagenes estan siempre en la raiz.
+bool img_en_uso(const char *sfn);
+
+// El nombre corto 8.3 de lo que devolvio f_stat o f_readdir
+const char *img_sfn(const FILINFO *fi);
+
+// Cambia cada vez que se monta la FAT: lo abierto con la anterior no sirve.
+uint32_t img_generacion(void);
+
+// Si r es un fallo de la tarjeta, la da por caida (hay que reiniciarla) y
+// devuelve true.
+bool img_fallo(FRESULT r);
 
 // CALL SDFFILES: los .DSK de la raiz como ASCIIZ seguidos, y un nombre vacio
 // al final. Devuelve cuantos bytes escribio.

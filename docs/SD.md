@@ -76,6 +76,9 @@ contesta "cambiado" en el siguiente `DSKCHG` y el DOS relee la FAT.
   a BASIC.
 
 El fuente es `comandos/sdf.asm`; se ensambla con `python tools/comandos.py`.
+
+Para recorrer la SD entera y copiar archivos sueltos entre la SD y el disco,
+está `SD.COM` (`ARCHIVOS.md`).
 Para saber qué hay montado usa un comando que la DiskROM no necesita:
 
 ```

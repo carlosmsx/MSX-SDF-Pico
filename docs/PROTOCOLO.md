@@ -156,7 +156,8 @@ núcleo 0 contesta, normalmente en menos de un milisegundo.
 
 Los comandos de `WIFI.COM` (0B5h a 0B8h, en `WIFI.md`) siguen el mismo camino
 por el núcleo 0. `CMD_WIFIJOIN` lleva dos textos con su largo (la red y la
-clave), así que los parámetros de un comando pueden llegar a 100 bytes.
+clave), así que los parámetros de un comando pueden llegar a 100 bytes; los de
+`CMD_FSREN` (`ARCHIVOS.md`), con dos rutas, hasta 256.
 
 ## Condición de carrera al enviar un comando
 

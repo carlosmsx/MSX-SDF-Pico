@@ -63,7 +63,9 @@ Resultado esperado:
 | 40 | `40` | El estado sigue listo |
 
 Con el firmware normal la consola no muestra cada acceso; para verlos, usar
-`sdf_pico_diag.uf2`.
+`sdf_pico_diag.uf2`. Las variantes de prueba no se compilan por defecto: hay
+que configurar con `-DSDF_VARIANTES=ON` (por ejemplo,
+`cmake -S . -B build -DSDF_VARIANTES=ON` y después `build.ps1`).
 
 ## Prueba de las ocho líneas de datos
 

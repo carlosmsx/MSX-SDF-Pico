@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include "ff.h"
 #include "consola.h"
 #include "sd_spi.h"
@@ -24,6 +25,7 @@ static FIL arch[3];
 static bool abierta[3], solo_lectura[3];
 static uint8_t cambio[2];       // lo levanta SDFMOUNT, lo consume DSKCHG
 static uint8_t drives = 2;
+static uint32_t generacion;     // cuantas veces se monto la FAT
 
 // La SD dejo de contestar (la sacaron, o fallo): todo lo abierto se da por
 // perdido y hay que volver a iniciarla.
@@ -32,6 +34,14 @@ static void caida(void)
     sd_ok = false;
     res_montaje = FR_NOT_READY;
     memset(abierta, 0, sizeof abierta);
+}
+
+// El nombre corto de lo que devolvio f_stat o f_readdir. Con LFN, FatFs deja
+// en fname el nombre largo (o el corto con minusculas) y en altname el corto;
+// altname queda vacio si el corto no tiene nada que agregar.
+const char *img_sfn(const FILINFO *fi)
+{
+    return fi->altname[0] ? fi->altname : fi->fname;
 }
 
 static bool fallo_de_disco(FRESULT r)
@@ -89,7 +99,7 @@ static uint8_t verificar(char *n)
         return ERR_FILE_NOT_FOUND;
     if (fi.fsize != DSK_720K_SIZE && fi.fsize != DSK_360K_SIZE)
         return ERR_BAD_FILE_MODE;
-    strncpy(n, fi.fname, NOMBRE_LEN - 1);
+    strncpy(n, img_sfn(&fi), NOMBRE_LEN - 1);
     n[NOMBRE_LEN - 1] = 0;
     return 0;
 }
@@ -148,6 +158,7 @@ bool img_iniciar(void)
     res_montaje = f_mount(&fs, "", 1);
     sd_ok = res_montaje == FR_OK;
     if (sd_ok) {
+        generacion++;
         cargar_cfg();
         cambio[0] = cambio[1] = 1;  // puede ser otra tarjeta: que el DOS relea
     }
@@ -163,6 +174,16 @@ void img_apagar(void)
 bool img_sd_ok(void)
 {
     return sd_ok;
+}
+
+uint32_t img_generacion(void)
+{
+    return generacion;
+}
+
+bool img_fallo(FRESULT r)
+{
+    return fallo_de_disco(r);
 }
 
 const char *img_sd_texto(void)
@@ -301,6 +322,14 @@ const char *img_nombre(uint8_t d)
     return d < NEW_DRIVE ? nombre[d] : "";
 }
 
+bool img_en_uso(const char *sfn)
+{
+    for (int d = 0; d <= NEW_DRIVE; d++)
+        if (nombre[d][0] && strcasecmp(nombre[d], sfn) == 0)
+            return true;
+    return false;
+}
+
 // Desmontar un drive que ya estaba vacio no es error.
 uint8_t img_desmontar(uint8_t d)
 {
@@ -408,12 +437,13 @@ uint32_t img_listar(uint8_t *buf, uint32_t max)
                 break;
             if (fi.fattrib & (AM_DIR | AM_HID | AM_SYS))
                 continue;
-            size_t l = strlen(fi.fname);
-            if (l <= 4 || strcmp(fi.fname + l - 4, ".DSK") != 0)
+            const char *corto = img_sfn(&fi);
+            size_t l = strlen(corto);
+            if (l <= 4 || strcmp(corto + l - 4, ".DSK") != 0)
                 continue;
             if (n + l + 2 > max)
                 break;
-            memcpy(buf + n, fi.fname, l + 1);
+            memcpy(buf + n, corto, l + 1);
             n += l + 1;
         }
         if (r == FR_OK)

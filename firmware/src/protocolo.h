@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PROTOCOL_VERSION  8   // el 7 del SDF-1, con registro de estado
-#define FW_VERSION        "SDF-Pico 0.9"
+#define FW_VERSION        "SDF-Pico 0.10"
 
 // Registro de estado, IN (01h). Ver docs/PROTOCOLO.md.
 #define EST_OCUPADO       0x80  // el firmware prepara la respuesta: no leer 00h
@@ -45,6 +45,21 @@
 #define CMD_WIFIJOIN      0xB8  // largo, red, largo, clave; contesta 0 o error (wifi_dos.h)
 
 // 0xDx: diagnostico
+// Archivos de la SD, para SD.COM y un explorador (archivos.h, docs/ARCHIVOS.md)
+#define CMD_FSCD          0xC0  // largo, ruta; contesta error
+#define CMD_FSPWD         0xC1  // contesta la ruta actual (ASCIIZ)
+#define CMD_FSDIR         0xC2  // opciones, largo, ruta o patron; contesta error, cantidad (L, H), cortado
+#define CMD_FSLIST        0xC3  // desde (L, H), max; contesta n y n entradas de FS_ENTRADA bytes
+#define CMD_FSOPEN        0xC4  // modo, largo, ruta; contesta error y largo (4 bytes)
+#define CMD_FSREAD        0xC5  // max (L, H); contesta error, n (L, H) y n bytes
+#define CMD_FSWRITE       0xC6  // n (L, H) y n bytes; contesta error
+#define CMD_FSCLOSE       0xC7  // contesta error
+#define CMD_FSDEL         0xC8  // largo, ruta; contesta error
+#define CMD_FSMKDIR       0xC9  // largo, ruta; contesta error
+#define CMD_FSREN         0xCA  // largo, ruta, largo, nombre nuevo; contesta error
+#define CMD_FSSTAT        0xCB  // largo, ruta; contesta error y una entrada
+#define CMD_FSFREE        0xCC  // contesta error, KB libres y KB en total (4 y 4 bytes)
+
 #define CMD_DEBUG         0xD0
 #define CMD_SDFTEST       0xD1
 #define CMD_SDFDEBUG      0xD2
@@ -80,13 +95,20 @@
 #define ERR_ILLEGAL_FUNCTION      5
 #define ERR_DEVICE_IO             19
 #define ERR_FILE_NOT_FOUND        53
+#define ERR_FILE_ALREADY_OPEN     54    // archivos.c: imagen montada, o el archivo abierto
 #define ERR_BAD_FILE_NAME         56
+#define ERR_FILE_NOT_OPEN         59    // archivos.c: FSREAD o FSWRITE sin FSOPEN
 #define ERR_BAD_FILE_MODE         61    // la imagen no es de 360 ni de 720 KB
 #define ERR_BAD_DRIVE_NAME        62
 #define ERR_FILE_ALREADY_EXISTS   65
 #define ERR_DISK_FULL             66
+#define ERR_WRITE_PROTECTED       68    // archivos.c: archivo de solo lectura
 #define ERR_DISK_IO               69
 #define ERR_DISK_OFFLINE          70    // no hay SD, o todavia no inicializo
+// Propios de archivos.c, sin equivalente en el BASIC de MSX-DOS 1
+#define ERR_PATH_NOT_FOUND        80    // no existe el directorio
+#define ERR_DIR_NOT_EMPTY         81
+#define ERR_IS_DIR                82    // se esperaba un archivo
 
 // Mientras se crea la imagen de CALL SDFNEW, la ROM lee esto en lugar del
 // resultado y vuelve a consultar.

@@ -8,6 +8,7 @@
 #include "hardware/spi.h"
 #include "pins.h"
 #include "sd_spi.h"
+#include "reloj.h"
 #include "ff.h"
 #include "diskio.h"
 
@@ -346,4 +347,14 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
         return ok ? RES_OK : RES_ERROR;
     }
     return RES_PARERR;
+}
+
+// Fecha de los archivos que crea o cambia FatFs: la hora local del reloj
+// (reloj.c). Si todavia no se puso, sale 1980-01-01.
+DWORD get_fattime(void)
+{
+    fecha_t f;
+    reloj_leer(&f);
+    return (DWORD)(f.anio - 1980) << 25 | (DWORD)f.mes << 21 | (DWORD)f.dia << 16
+         | (DWORD)f.hora << 11 | (DWORD)f.min << 5 | f.seg / 2;
 }
