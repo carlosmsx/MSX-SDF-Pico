@@ -104,6 +104,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | [docs/WIFI.md](docs/WIFI.md) | El Wi-Fi, `CALL WIFI`, `WIFI.COM` y la consola USB |
 | [docs/RELOJ.md](docs/RELOJ.md) | El reloj, la zona horaria y `OPEN "RTC:"` |
 | [docs/RED.md](docs/RED.md) | Conexión TCP para terminales (en desarrollo) |
+| [docs/CAMARA.md](docs/CAMARA.md) | Fotos de una cámara IP en SCREEN 2: `CAM.COM` (en desarrollo) |
 | [docs/VI.md](docs/VI.md) | `VI.COM`, un editor al estilo de vi para MSX-DOS 1 |
 | [docs/COMANDOS.md](docs/COMANDOS.md) | Utilidades de MSX-DOS 1: `GREP.COM` |
 | [docs/PROTOCOLO.md](docs/PROTOCOLO.md) | Protocolo entre la DiskROM y el firmware |
@@ -114,7 +115,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | Carpeta | Contenido |
 |---|---|
 | `diskrom/` | DiskROM (Z80), derivada de la del SDF-1 |
-| `comandos/` | Programas de MSX-DOS: `PING.COM`, `WIFI.COM`, `GET.COM`, `SDF.COM` y `SD.COM`, que usan la Pico, y `VI.COM` y `GREP.COM` |
+| `comandos/` | Programas de MSX-DOS: `PING.COM`, `WIFI.COM`, `GET.COM`, `SDF.COM`, `SD.COM` y `CAM.COM`, que usan la Pico, y `VI.COM` y `GREP.COM` |
 | `hardware/` | Modificación de la placa del SDF-1 y cableado de la Pico |
 | `firmware/` | Firmware de la Pico, en C con el pico-sdk |
 | `docs/` | Documentación de cada función y del protocolo |

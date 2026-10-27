@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PROTOCOL_VERSION  8   // el 7 del SDF-1, con registro de estado
-#define FW_VERSION        "SDF-Pico 0.10"
+#define FW_VERSION        "SDF-Pico 0.11"
 
 // Registro de estado, IN (01h). Ver docs/PROTOCOLO.md.
 #define EST_OCUPADO       0x80  // el firmware prepara la respuesta: no leer 00h
@@ -43,6 +43,11 @@
 #define CMD_WIFISCAN      0xB6  // empieza a buscar redes; contesta 0 o error (wifi_dos.h)
 #define CMD_WIFIREDES     0xB7  // contesta buscando, n, n redes (wifi_dos.h)
 #define CMD_WIFIJOIN      0xB8  // largo, red, largo, clave; contesta 0 o error (wifi_dos.h)
+#define CMD_CAMSHOT       0xB9  // largo, URL (0: la guardada); contesta 0 o error (camara.h)
+#define CMD_CAMPOLL       0xBA  // contesta estado, resultado, detalle, ancho, alto, ms: 10 bytes
+#define CMD_CAMREAD       0xBB  // bloque (0-47); contesta 256 bytes de patrones y colores
+#define CMD_CAMURL        0xBC  // largo, URL; la guarda (largo 0 la olvida), contesta 0 o error
+#define CMD_CAMVER        0xBD  // contesta la URL guardada, sin la clave (ASCIIZ)
 
 // 0xDx: diagnostico
 // Archivos de la SD, para SD.COM y un explorador (archivos.h, docs/ARCHIVOS.md)

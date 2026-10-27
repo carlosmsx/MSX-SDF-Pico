@@ -16,6 +16,7 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "bus.h"
+#include "camara.h"
 #include "consola.h"
 #include "protocolo.h"
 #include "ping.h"
@@ -62,7 +63,7 @@ static bool leer_zona(const char *txt, int *minutos)
 
 static void comando(const char *linea)
 {
-    if (linea[0] == 0 || wifi_comando(linea) || red_comando(linea))
+    if (linea[0] == 0 || wifi_comando(linea) || red_comando(linea) || cam_comando(linea))
         return;
     if (strcmp(linea, "hora") == 0) {
         mostrar_hora();
@@ -90,7 +91,9 @@ static void comando(const char *linea)
            "  tcp <host> <puerto>  abre la conexion que usa el MSX (RetroTerm);\n"
            "                tcp cerrar, tcp baudios N, tcp traza, tcp: estado\n"
            "  hora          fecha, hora y de donde salio\n"
-           "  zona <h>      zona horaria: zona -3, zona +5:30\n");
+           "  zona <h>      zona horaria: zona -3, zona +5:30\n"
+           "  camara        URL de la camara (sin la clave) y la ultima foto\n"
+           "  camara foto   saca una foto con la URL guardada y dice cuanto tardo\n");
 }
 
 int main(void)
@@ -98,6 +101,7 @@ int main(void)
     stdio_init_all();
     ajustes_leer();
     reloj_init(ajustes_zona());
+    cam_iniciar();
     bus_init();
     multicore_launch_core1(protocolo_core1);
 
@@ -112,6 +116,7 @@ int main(void)
         red_tarea();
         ping_tarea();
         wdos_tarea();
+        cam_tarea();
         const char *linea = consola_linea(wifi_pide_clave());
         if (linea)
             comando(linea);

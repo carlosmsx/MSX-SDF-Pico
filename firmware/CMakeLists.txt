@@ -27,8 +27,11 @@ set(FUENTES
     src/ajustes.c
     src/reloj.c
     src/dispositivos.c
+    src/camara.c
+    src/sc2.c
     lib/fatfs/ff.c
     lib/fatfs/ffunicode.c
+    lib/tjpgd/tjpgd.c
 )
 # src/disco.c (el disco en la flash de la Pico, docs/DISCO-FLASH.md) quedo
 # fuera de la compilacion: fue el respaldo de prueba antes de la SD.
@@ -42,7 +45,7 @@ option(SDF_VARIANTES "Compilar tambien sdf_pico_escucha y sdf_pico_diag" OFF)
 function(firmware nombre)
     add_executable(${nombre} ${FUENTES})
     pico_generate_pio_header(${nombre} ${CMAKE_CURRENT_LIST_DIR}/src/bus.pio)
-    target_include_directories(${nombre} PRIVATE lib/fatfs src)
+    target_include_directories(${nombre} PRIVATE lib/fatfs lib/tjpgd src)
     # Todo en RAM: el nucleo que atiende el bus no depende de la cache de flash.
     pico_set_binary_type(${nombre} copy_to_ram)
     # La consola va por el USB nativo: la UART0 queda para los perifericos.

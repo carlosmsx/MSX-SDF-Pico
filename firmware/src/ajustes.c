@@ -5,9 +5,10 @@
 #include "hardware/sync.h"
 #include "ajustes.h"
 
-// Anteultimo sector de la flash (4 KB), lejos del programa, en dos paginas:
-// la red (el formato del firmware 0.4) y la zona horaria. Cada una con su
-// marca y su suma: una pagina borrada o vieja vale lo de fabrica.
+// Anteultimo sector de la flash (4 KB), lejos del programa, en tres
+// paginas: la red (el formato del firmware 0.4), la zona horaria y la URL de
+// la camara (desde el 0.11). Cada una con su marca y su suma: una pagina
+// borrada o vieja vale lo de fabrica.
 //
 // No el ultimo: todo .uf2 para RP2350 empieza con un bloque en 0x10FFFF00
 // (la solucion del SDK a la errata RP2350-E10), el final de una flash de
@@ -21,6 +22,7 @@
 #define OFFSET          (PICO_FLASH_SIZE_BYTES - 2 * FLASH_SECTOR_SIZE)
 #define MARCA_RED       0x49464957u     // "WIFI"
 #define MARCA_ZONA      0x414E4F5Au     // "ZONA"
+#define MARCA_CAM       0x524D4143u     // "CAMR"
 
 typedef struct {
     uint32_t marca;
@@ -35,8 +37,15 @@ typedef struct {
     uint32_t suma;
 } zona_t;
 
+typedef struct {
+    uint32_t marca;
+    char url[AJ_URL_MAX + 1];
+    uint32_t suma;
+} camara_t;
+
 static red_t red;
 static zona_t zona;
+static camara_t camara;
 
 static uint32_t suma_de(const void *datos, size_t n)
 {
@@ -51,6 +60,7 @@ void ajustes_leer(void)
 {
     const red_t *r = (const red_t *)(XIP_BASE + OFFSET);
     const zona_t *z = (const zona_t *)(XIP_BASE + OFFSET + FLASH_PAGE_SIZE);
+    const camara_t *c = (const camara_t *)(XIP_BASE + OFFSET + 2 * FLASH_PAGE_SIZE);
 
     memset(&red, 0, sizeof red);
     if (r->marca == MARCA_RED && r->suma == suma_de(r, offsetof(red_t, suma))
@@ -61,11 +71,16 @@ void ajustes_leer(void)
     if (z->marca == MARCA_ZONA && z->suma == suma_de(z, offsetof(zona_t, suma))
         && z->minutos >= -12 * 60 && z->minutos <= 14 * 60)
         zona.minutos = z->minutos;
+
+    memset(&camara, 0, sizeof camara);
+    if (c->marca == MARCA_CAM && c->suma == suma_de(c, offsetof(camara_t, suma))
+        && c->url[AJ_URL_MAX] == 0)
+        camara = *c;
 }
 
 static void grabar(void)
 {
-    static uint8_t paginas[2 * FLASH_PAGE_SIZE];
+    static uint8_t paginas[3 * FLASH_PAGE_SIZE];
     memset(paginas, 0xFF, sizeof paginas);
     if (red.ssid[0]) {
         red.marca = MARCA_RED;
@@ -75,13 +90,18 @@ static void grabar(void)
     zona.marca = MARCA_ZONA;
     zona.suma = suma_de(&zona, offsetof(zona_t, suma));
     memcpy(paginas + FLASH_PAGE_SIZE, &zona, sizeof zona);
+    if (camara.url[0]) {
+        camara.marca = MARCA_CAM;
+        camara.suma = suma_de(&camara, offsetof(camara_t, suma));
+        memcpy(paginas + 2 * FLASH_PAGE_SIZE, &camara, sizeof camara);
+    }
 
     uint32_t ints = save_and_disable_interrupts();
     flash_range_erase(OFFSET, FLASH_SECTOR_SIZE);
     flash_range_program(OFFSET, paginas, sizeof paginas);
     restore_interrupts(ints);
 
-    memset(paginas, 0, sizeof paginas);     // que la clave no quede en la RAM
+    memset(paginas, 0, sizeof paginas);     // que las claves no queden en la RAM
 }
 
 const char *ajustes_ssid(void)
@@ -97,6 +117,11 @@ const char *ajustes_clave(void)
 int ajustes_zona(void)
 {
     return zona.minutos;
+}
+
+const char *ajustes_camara(void)
+{
+    return camara.url;
 }
 
 void ajustes_poner_red(const char *ssid, const char *clave)
@@ -119,5 +144,14 @@ void ajustes_poner_zona(int minutos)
     if (minutos == zona.minutos)
         return;
     zona.minutos = minutos;
+    grabar();
+}
+
+void ajustes_poner_camara(const char *url)
+{
+    if (strcmp(url, camara.url) == 0)
+        return;
+    memset(&camara, 0, sizeof camara);
+    strncpy(camara.url, url, AJ_URL_MAX);
     grabar();
 }

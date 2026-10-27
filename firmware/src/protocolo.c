@@ -18,6 +18,7 @@
 #include "pico/stdlib.h"
 #include "archivos.h"
 #include "bus.h"
+#include "camara.h"
 #include "consola.h"
 #include "dispositivos.h"
 #include "imagenes.h"
@@ -56,6 +57,8 @@ static params_t params_de(uint8_t cmd)
     case CMD_NETCONN:                   return (params_t){P_NOMBRE, 2};
     case CMD_NETIO:                     return (params_t){P_NOMBRE, 1};
     case CMD_PINGSEND:                  return (params_t){P_NOMBRE, 0};
+    case CMD_CAMSHOT: case CMD_CAMURL:  return (params_t){P_NOMBRE, 0};
+    case CMD_CAMREAD:                   return (params_t){P_FIJO, 1};
     case CMD_WIFIJOIN:                  return (params_t){P_DOBLE, 0};
     case CMD_FSCD: case CMD_FSDEL: case CMD_FSMKDIR: case CMD_FSSTAT:
                                         return (params_t){P_NOMBRE, 0};
@@ -399,6 +402,24 @@ static void ejecutar(void)
         break;
     }
     case CMD_PINGPOLL:  n = ping_leer(resp); break;
+
+    // Camara IP (camara.c): la foto la arma el nucleo 0 y CAM.COM consulta
+    case CMD_CAMSHOT:
+        resp[n++] = cam_pedir((char *)par + 1, par[0]);
+        memset(par, 0, sizeof par);     // la clave, si la URL la lleva
+        break;
+    case CMD_CAMPOLL:   n = cam_leer_estado(resp); break;
+    case CMD_CAMREAD: {
+        const uint8_t *b = cam_bloque(par[0]);
+        if (b)
+            bus_tx_enviar(b, CAM_BLOQUE);
+        break;
+    }
+    case CMD_CAMURL:
+        resp[n++] = cam_guardar_url((char *)par + 1, par[0]);
+        memset(par, 0, sizeof par);     // la clave
+        break;
+    case CMD_CAMVER:    bus_tx_enviar(io_buf, cam_url_visible((char *)io_buf)); break;
 
     case CMD_WIFISTAT: case CMD_WIFISCAN: case CMD_WIFIREDES: case CMD_WIFIJOIN:
         // OCUPADO hasta que el nucleo 0 conteste (esperar_nucleo0)
