@@ -54,3 +54,35 @@ Un patrón con espacios va entre comillas: `GREP "hola mundo" *.TXT`.
 
 Probado en la DPC-200. En WebMSX recorre un archivo de 35 KB y 3000 líneas
 en unos 3,5 s.
+
+## SLEEP.COM
+
+```
+SLEEP segundos
+```
+
+Espera esa cantidad de segundos, de 0 a 65535, y vuelve al DOS. Sirve en los
+`.BAT` para dar tiempo entre un comando y otro:
+
+```
+GET http://192.168.0.10:8000/FOTO.SC2
+SLEEP 5
+GET http://192.168.0.10:8000/FOTO2.SC2
+```
+
+- Cuenta con `JIFFY` (FC9Eh), que avanza con la interrupción del VDP, y toma
+  50 o 60 Hz según el byte 002Bh de la BIOS.
+- CTRL+C corta la espera.
+
+## REBOOT.COM
+
+```
+REBOOT
+```
+
+Reinicia el MSX como el botón de reset: hace una llamada entre slots a 0000h
+de la BIOS, que vuelve a arrancar todo (slots, RAM, cartuchos y el DOS). La
+imagen montada en la SD se mantiene, porque la Pico no se reinicia.
+
+- Conviene tener los archivos cerrados: lo que quede en los búferes del DOS
+  sin escribir se pierde, igual que con el reset.
