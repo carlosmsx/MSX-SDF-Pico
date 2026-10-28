@@ -46,11 +46,13 @@ EXTRN		GETWRK          ;get base  of  work  area  in  [IX]  and
 EXTRN		SETINT,PRVINT
 ; PROMPT	prompt for phantom drive
 ; RAWFLG	verify flag
-; $SECBUF	temporary sectorbuffer (no se usa: lo pedia CALL FFILES)
+; $SECBUF	temporary sectorbuffer: los sectores de la pagina 1 (ver PAGE1)
 ; GETSLOT	slot del cartucho, para poner la pagina 2 (ver CALLP2)
 ; ENASLT	habilita un slot en una pagina
 ; RAMAD2	slot de la RAM de la pagina 2
 EXTRN		GETSLOT,ENASLT,RAMAD2
+; XFER		LDIR con la RAM en la pagina 1 (ver PAGE1)
+EXTRN		XFER,$SECBUF
 ; XFER		transfer to TPA
 ; DISINT	inform interrupts are being disabled
 ; ENAINT	inform interrupts are being enabled
@@ -401,9 +403,21 @@ WRITE:
 	LD		D,B				;store n-sectors ;/\
 WRSEC:
 	PUSH	BC				;only B matters
-	LD		BC,PORT_DATA	;B=0: 256 bytes por OTIR; C=puerto de datos
-	OTIR					;21 T por byte: la PIO toma cada uno en ~100 ns
-	OTIR
+	CALL	PAGE1
+	JR		NC,.WRDIR
+	PUSH	DE				;D = n-sectors
+	LD		DE,($SECBUF)	;de la pagina 1: primero a $SECBUF
+	LD		BC,512
+	CALL	XFER			;HL queda en el sector siguiente
+	PUSH	HL
+	LD		HL,($SECBUF)
+	CALL	OUTSEC
+	POP		HL
+	POP		DE
+	JR		.WRSENT
+.WRDIR:
+	CALL	OUTSEC
+.WRSENT:
 	POP		BC
 	CALL	WaitReady		;el firmware guarda el sector
 	LD		A,10			;write fault, si no termina
@@ -451,13 +465,50 @@ RDSEC:
 	LD		A,2				;not ready, si no llega
 	JR		C,DSKIOERROR	;B = sectores que faltan
 	PUSH	BC				;only B matters
-	LD		BC,PORT_DATA	;B=0: 256 bytes por INIR; C=puerto de datos
-	INIR					;21 T por byte: el firmware tiene el sector entero
-	INIR					;en camino por DMA desde que bajo OCUPADO
+	CALL	PAGE1
+	JR		NC,.RDDIR
+	PUSH	HL				;a la pagina 1: primero a $SECBUF
+	LD		HL,($SECBUF)
+	CALL	INSEC
+	POP		DE
+	LD		HL,($SECBUF)
+	LD		BC,512
+	CALL	XFER			;DE queda en el sector siguiente
+	EX		DE,HL
+	JR		.RDDONE
+.RDDIR:
+	CALL	INSEC
+.RDDONE:
 	POP		BC
 	DJNZ	RDSEC			;relative jump
 	SCF
 	CCF						;no errors
+	RET
+
+;Mientras corre el driver, la pagina 1 es esta ROM: un sector que cae en
+;4000h-7FFFh (o que empieza en 3E01h-3FFFh y entra) no se puede pasar
+;directo con INIR/OTIR, que leerian o escribirian la ROM. Esos van por
+;$SECBUF y XFER, que pone la RAM en la pagina 1 para copiar (DISK.MEM del
+;kit). Sale con carry si HL es uno de esos.
+PAGE1:
+	LD		A,H
+	CP		80H
+	RET		NC				;8000h o mas: directo
+	CP		3EH
+	CCF						;carry si 3E00h o mas
+	RET
+
+;OUTSEC/INSEC: un sector desde/hacia HL. HL queda en el siguiente.
+OUTSEC:
+	LD		BC,PORT_DATA	;B=0: 256 bytes por OTIR; C=puerto de datos
+	OTIR					;21 T por byte: la PIO toma cada uno en ~100 ns
+	OTIR
+	RET
+
+INSEC:
+	LD		BC,PORT_DATA	;B=0: 256 bytes por INIR; C=puerto de datos
+	INIR					;21 T por byte: el firmware tiene el sector entero
+	INIR					;en camino por DMA desde que bajo OCUPADO
 	RET
 
 
