@@ -15,6 +15,7 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "actualizar.h"
 #include "bus.h"
 #include "camara.h"
 #include "consola.h"
@@ -63,10 +64,16 @@ static bool leer_zona(const char *txt, int *minutos)
 
 static void comando(const char *linea)
 {
-    if (linea[0] == 0 || wifi_comando(linea) || red_comando(linea) || cam_comando(linea))
+    if (linea[0] == 0 || wifi_comando(linea) || red_comando(linea) || cam_comando(linea)
+        || act_comando(linea))
         return;
     if (strcmp(linea, "hora") == 0) {
         mostrar_hora();
+        return;
+    }
+    if (strcmp(linea, "borrar todo") == 0) {
+        wdos_borrar();
+        printf("borrados la red, la URL de la camara y la ultima foto; zona UTC-3\n");
         return;
     }
     if (strncmp(linea, "zona ", 5) == 0) {
@@ -93,7 +100,11 @@ static void comando(const char *linea)
            "  hora          fecha, hora y de donde salio\n"
            "  zona <h>      zona horaria: zona -3, zona +5:30\n"
            "  camara        URL de la camara (sin la clave) y la ultima foto\n"
-           "  camara foto   saca una foto con la URL guardada y dice cuanto tardo\n");
+           "  camara foto   saca una foto con la URL guardada y dice cuanto tardo\n"
+           "  actualizar    pregunta a GitHub cual es el ultimo firmware\n"
+           "  actualizar si lo baja, lo verifica, lo graba y reinicia (SDF UPDATE)\n"
+           "  borrar todo   borra la red, su clave, la URL de la camara y la ultima\n"
+           "                foto, y vuelve la zona a UTC-3 (SDF BORRAR en MSX-DOS)\n");
 }
 
 int main(void)
@@ -117,6 +128,7 @@ int main(void)
         ping_tarea();
         wdos_tarea();
         cam_tarea();
+        act_tarea();
         const char *linea = consola_linea(wifi_pide_clave());
         if (linea)
             comando(linea);

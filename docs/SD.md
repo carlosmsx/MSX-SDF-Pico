@@ -53,6 +53,8 @@ Los mismos comandos, desde el DOS (MSX-DOS 1):
 | `SDF UMOUNT d:` | Deja `d:` sin imagen |
 | `SDF NEW X [360]` | Crea `X.DSK` vacía y formateada, de 720 KB o de 360 KB; no la monta |
 | `SDF DRIVES n` | Cantidad de unidades, 1 o 2, desde el próximo arranque |
+| `SDF BORRAR` | Borra los datos personales de la Pico; antes pide confirmar |
+| `SDF UPDATE [/F]` | Baja el último firmware de GitHub y lo graba; antes pide confirmar (`ACTUALIZAR.md`) |
 
 ```
 B>SDF
@@ -75,6 +77,21 @@ contesta "cambiado" en el siguiente `DSKCHG` y el DOS relee la FAT.
   puede copiar en el programa. Si se arranca desde esa imagen, el MSX sigue
   a BASIC.
 
+### Borrar los datos personales
+
+`SDF BORRAR` deja la Pico como de fábrica antes de prestarla o venderla. Pide
+confirmar con `S` y después:
+
+- desconecta el Wi-Fi y borra la red guardada y su clave;
+- cierra la conexión TCP, si hay una abierta;
+- borra la URL de la cámara, con su usuario y su clave, y la última foto;
+- devuelve la zona horaria a UTC-3.
+
+Los ajustes viven en un sector de la flash de la Pico, que queda borrado
+entero (en FFh). Lo que está en la SD (las imágenes y `SDFPICO.CFG`) no se
+toca. Desde la consola USB hace lo mismo `borrar todo`. Necesita el firmware
+0.13.
+
 El fuente es `comandos/sdf.asm`; se ensambla con `python tools/comandos.py`.
 
 Para recorrer la SD entera y copiar archivos sueltos entre la SD y el disco,
@@ -86,6 +103,14 @@ OUT (01h), CMD_SDFINFO          0E6h
 IN  (00h)               unidades que ve el DOS, 1 o 2
 IN  (00h) ... 0         imagen de A:, vacía si no hay
 IN  (00h) ... 0         imagen de B:, vacía si no hay
+```
+
+Y para `SDF BORRAR`, con un parámetro fijo para que un byte suelto no alcance:
+
+```
+OUT (01h), CMD_SDFBORRAR        0E7h
+OUT (00h), 5Ah
+IN  (00h)               0, o 5 si el parámetro no es 5Ah
 ```
 
 > **Estado:** probado en la DPC-200. Para probar cambios sin hardware,

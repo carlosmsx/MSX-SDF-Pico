@@ -155,3 +155,15 @@ void ajustes_poner_camara(const char *url)
     strncpy(camara.url, url, AJ_URL_MAX);
     grabar();
 }
+
+void ajustes_borrar(void)
+{
+    memset(&red, 0, sizeof red);
+    memset(&camara, 0, sizeof camara);
+    zona.minutos = AJ_ZONA_INICIAL;
+
+    // Sin grabar nada despues: el sector queda en FFh, como una Pico nueva
+    uint32_t ints = save_and_disable_interrupts();
+    flash_range_erase(OFFSET, FLASH_SECTOR_SIZE);
+    restore_interrupts(ints);
+}

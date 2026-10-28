@@ -1,5 +1,5 @@
 // Wi-Fi para WIFI.COM (CMD_WIFISTAT, CMD_WIFISCAN, CMD_WIFIREDES y
-// CMD_WIFIJOIN, docs/WIFI.md).
+// CMD_WIFIJOIN, docs/WIFI.md), y CMD_SDFBORRAR de SDF.COM (docs/SD.md).
 //
 // Lo mismo que CALL WIFI, pero el programa de DOS arma la pantalla: el
 // firmware solo da el estado, la lista de redes y conecta. Como el Wi-Fi vive
@@ -30,3 +30,8 @@ int wdos_respuesta(const uint8_t **datos);
 
 // Nucleo 0: atiende el pedido pendiente, si hay.
 void wdos_tarea(void);
+
+// Nucleo 0: CMD_SDFBORRAR y el "borrar todo" de la consola. Olvida la red
+// (y se desconecta), cierra la conexion TCP, olvida la URL de la camara y la
+// ultima foto, y deja los ajustes de la flash como de fabrica.
+void wdos_borrar(void);

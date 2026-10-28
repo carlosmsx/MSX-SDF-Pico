@@ -25,3 +25,7 @@ const char *ajustes_camara(void);   // "" si no hay URL guardada
 void ajustes_poner_red(const char *ssid, const char *clave);
 void ajustes_poner_zona(int minutos);
 void ajustes_poner_camara(const char *url);
+
+// Vuelve a lo de fabrica: borra el sector entero (red, clave, URL de la
+// camara) y la zona queda en AJ_ZONA_INICIAL.
+void ajustes_borrar(void);

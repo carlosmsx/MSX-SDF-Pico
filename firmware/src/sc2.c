@@ -47,6 +47,12 @@ static struct {
 
 static uint32_t pool[POOL / 4];
 
+void *sc2_prestar(size_t *n)
+{
+    *n = sizeof banda;
+    return banda;
+}
+
 // ---- Pares de colores ----
 
 static inline int clip(int v)

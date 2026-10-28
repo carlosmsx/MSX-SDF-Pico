@@ -448,6 +448,19 @@ void cam_iniciar(void)
     strncpy(url_guardada, ajustes_camara(), CAM_URL_MAX);
 }
 
+void cam_olvidar(void)
+{
+    // La foto corre en este mismo nucleo (cam_tarea): ahora no hay ninguna a
+    // medias. Un pedido pendiente sale con CAM_SIN_URL.
+    atendido_url = pedido_url;
+    memset(g_url, 0, sizeof g_url);
+    memset(p_url, 0, sizeof p_url);
+    memset(url_guardada, 0, sizeof url_guardada);
+    memset(pantalla, 0, sizeof pantalla);
+    detalle = ancho = alto = ms = 0;
+    res = CAM_SIN_URL;
+}
+
 static bool consola_espera;     // la consola pidio la foto: mostrar el resultado
 
 static void informar(void)

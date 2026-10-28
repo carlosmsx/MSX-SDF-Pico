@@ -1,0 +1,30 @@
+/* Reemplaza al del SDK (pico_add_linker_script_override_path en
+   CMakeLists.txt). Con copy_to_ram todo va a la RAM salvo .flashdata; aca
+   se suman el codigo y las constantes de mbedTLS, lwIP, el Wi-Fi y la
+   conversion de la camara, que no entran en la RAM junto al resto y el TLS.
+
+   Es codigo que solo corre en el nucleo 0 (archivos enteros: nada que llame
+   el nucleo 1), y el 0 graba la flash con las interrupciones cortadas
+   (ajustes.c, actualizar.c), asi que nadie lo ejecuta mientras la flash no
+   se puede leer. */
+
+SECTIONS
+{
+    .rodata : {
+        /* segments not marked as .flashdata are instead pulled into .data (in RAM) to avoid accidental flash accesses */
+        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.flashdata*)))
+        . = ALIGN(4);
+        *lib/mbedtls/*(.text* .rodata*)
+        *pico_mbedtls/*(.text* .rodata*)
+        *lib/lwip/*(.text* .rodata*)
+        *lib/cyw43-driver/*(.text* .rodata*)
+        *rp2_common/pico_cyw43_driver/*(.text* .rodata*)
+        *rp2_common/pico_cyw43_arch/*(.text* .rodata*)
+        *rp2_common/pico_lwip/*(.text* .rodata*)
+        *lib/tjpgd/*(.text* .rodata*)
+        *src/sc2.c.obj(.text* .rodata*)
+        *src/wifi.c.obj(.text* .rodata*)
+        *src/https.c.obj(.text* .rodata*)
+        . = ALIGN(4);
+    } > TEXT_STORE
+}

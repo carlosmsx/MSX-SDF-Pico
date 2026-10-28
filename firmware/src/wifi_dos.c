@@ -1,7 +1,11 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/sync.h"
+#include "ajustes.h"
+#include "camara.h"
 #include "protocolo.h"
+#include "red.h"
+#include "reloj.h"
 #include "wifi.h"
 #include "wifi_dos.h"
 
@@ -117,6 +121,15 @@ static uint8_t conectar(void)
     return WDOS_OK;
 }
 
+void wdos_borrar(void)
+{
+    wifi_olvidar();
+    red_conectar("", 0);
+    cam_olvidar();
+    ajustes_borrar();
+    reloj_poner_zona(ajustes_zona());
+}
+
 void wdos_tarea(void)
 {
     uint32_t p = pedido;
@@ -138,6 +151,10 @@ void wdos_tarea(void)
         break;
     case CMD_WIFIJOIN:
         out(conectar());
+        break;
+    case CMD_SDFBORRAR:
+        wdos_borrar();
+        out(0);
         break;
     }
     memset(p_par, 0, sizeof p_par);     // la clave no queda en la RAM

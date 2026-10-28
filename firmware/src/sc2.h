@@ -31,3 +31,8 @@ typedef size_t (*sc2_entrada_t)(void *ctx, uint8_t *buf, size_t n);
 // en cada tercio. ancho y alto: los del JPEG.
 int sc2_convertir(sc2_entrada_t entrada, void *ctx, uint8_t *pantalla,
                   uint16_t *ancho, uint16_t *alto, uint8_t *detalle);
+
+// La banda, prestada mientras no hay conversion: https.c pone ahi el bufer
+// de entrada del TLS. Las dos cosas corren en el bucle del nucleo 0, nunca a
+// la vez. Hay que devolverla en cero.
+void *sc2_prestar(size_t *n);

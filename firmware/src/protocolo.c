@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
+#include "actualizar.h"
 #include "archivos.h"
 #include "bus.h"
 #include "camara.h"
@@ -48,6 +49,7 @@ static params_t params_de(uint8_t cmd)
     case CMD_DEBUG:                     return (params_t){P_FIJO, 1};
     case CMD_RTCSETDA: case CMD_RTCSETTI: return (params_t){P_FIJO, 3};
     case CMD_SDFUMOUNT: case CMD_SDFDRIVES: return (params_t){P_FIJO, 1};
+    case CMD_SDFBORRAR:                 return (params_t){P_FIJO, 1};
     case CMD_SDFMOUNT: case CMD_SDFNEW: return (params_t){P_NOMBRE, 1};
     case CMD_DEVNAME:                   return (params_t){P_ASCIIZ, 0};
     case CMD_DEVOPEN:                   return (params_t){P_NOMBRE, 2};
@@ -59,6 +61,7 @@ static params_t params_de(uint8_t cmd)
     case CMD_PINGSEND:                  return (params_t){P_NOMBRE, 0};
     case CMD_CAMSHOT: case CMD_CAMURL:  return (params_t){P_NOMBRE, 0};
     case CMD_CAMREAD:                   return (params_t){P_FIJO, 1};
+    case CMD_UPDATE:                    return (params_t){P_FIJO, 2};
     case CMD_WIFIJOIN:                  return (params_t){P_DOBLE, 0};
     case CMD_FSCD: case CMD_FSDEL: case CMD_FSMKDIR: case CMD_FSSTAT:
                                         return (params_t){P_NOMBRE, 0};
@@ -421,6 +424,19 @@ static void ejecutar(void)
         break;
     case CMD_CAMVER:    bus_tx_enviar(io_buf, cam_url_visible((char *)io_buf)); break;
 
+    // Actualizacion del firmware (actualizar.c): la hace el nucleo 0, SDF UPDATE consulta
+    case CMD_UPDATE:    resp[n++] = act_pedir(par[0], par[1]); break;
+    case CMD_UPDPOLL:   n = act_leer_estado(resp); break;
+
+    case CMD_SDFBORRAR:
+        if (par[0] != SDFBORRAR_SI) {
+            resp[n++] = 5;      // Illegal function call
+            break;
+        }
+        // Lo hace el nucleo 0, como los pedidos de WIFI.COM
+        wdos_pedir(cmd, par, npar);
+        esperando_wdos = true;
+        return;
     case CMD_WIFISTAT: case CMD_WIFISCAN: case CMD_WIFIREDES: case CMD_WIFIJOIN:
         // OCUPADO hasta que el nucleo 0 conteste (esperar_nucleo0)
         wdos_pedir(cmd, par, npar);

@@ -62,6 +62,8 @@ const uint8_t *cam_bloque(int i);
 // ---- Nucleo 0 ----
 
 void cam_iniciar(void);
+// Olvida la URL (guardada o pedida) y la ultima foto. Nucleo 0.
+void cam_olvidar(void);
 void cam_tarea(void);
 
 // Comandos de la consola USB. true si la linea era para la camara.

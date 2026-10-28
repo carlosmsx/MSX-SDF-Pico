@@ -194,6 +194,9 @@ borran la clave de la memoria después de usarla.
 | `conectar <n>` | Conecta a la red `n` de la última búsqueda; pide la clave |
 | `conectar <nombre>` | Lo mismo, por nombre (sirve para redes ocultas) |
 | `olvidar` | Desconecta y borra la red guardada |
+| `borrar todo` | Borra también la URL de la cámara y la última foto, y vuelve la zona a UTC-3 (`SDF BORRAR` en `SD.md`) |
+| `actualizar` | Pregunta a GitHub cuál es el último firmware (`ACTUALIZAR.md`) |
+| `actualizar si` | Lo baja, lo verifica, lo graba y reinicia (`SDF UPDATE` en MSX-DOS) |
 | `ayuda` | Lista los comandos |
 
 Una clave vacía conecta a una red abierta. Las demás se conectan con

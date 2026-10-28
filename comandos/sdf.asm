@@ -6,6 +6,9 @@
 ;   SDF UMOUNT d:       deja d: sin imagen
 ;   SDF NEW X [360]     crea X.DSK vacia y formateada (720 KB si no se dice)
 ;   SDF DRIVES n        unidades que ve el DOS, 1 o 2, desde el proximo arranque
+;   SDF BORRAR          borra los datos personales de la Pico (pide confirmar)
+;   SDF UPDATE [/F]     el ultimo firmware de GitHub (pide confirmar; /F,
+;                       aunque no sea mas nuevo)
 ;
 ; Los CALL SDF... de BASIC desde el DOS, con los mismos comandos del
 ; protocolo, mas CMD_SDFINFO para saber que hay montado. Despues de MOUNT el
@@ -18,6 +21,8 @@ LINLEN		EQU	0xF3B0
 
 SDFDATA		EQU	0x00
 SDFCMD		EQU	0x01
+CMD_UPDATE	EQU	0xBE
+CMD_UPDPOLL	EQU	0xBF
 CMD_SDFTEST	EQU	0xD1
 CMD_SDFMOUNT	EQU	0xE1
 CMD_SDFFILES	EQU	0xE2
@@ -25,10 +30,24 @@ CMD_SDFUMOUNT	EQU	0xE3
 CMD_SDFNEW	EQU	0xE4
 CMD_SDFDRIVES	EQU	0xE5
 CMD_SDFINFO	EQU	0xE6
+CMD_SDFBORRAR	EQU	0xE7
 CMD_WRITE	EQU	0xF0
 
 SDFNEW_BUSY	EQU	0xFE		; "todavia llenando la imagen", uno por segundo
 NEW_DRIVE	EQU	2		; la imagen recien creada
+SDFBORRAR_SI	EQU	0x5A		; el parametro de CMD_SDFBORRAR
+ACT_CONSULTAR	EQU	0		; modos de CMD_UPDATE (firmware/src/actualizar.h)
+ACT_ACTUALIZAR	EQU	1
+ACT_SI		EQU	0x5A		; su segundo parametro
+ACT_OCUPADA	EQU	1		; respuesta de CMD_UPDATE
+ACT_EN_CURSO	EQU	1		; estado de CMD_UPDPOLL
+ACT_LISTA	EQU	2
+ACT_BAJANDO	EQU	2		; fases
+ACT_VERIFICANDO	EQU	3
+ACT_GRABANDO	EQU	4
+ACT_TLS		EQU	4		; resultados con el detalle
+ACT_HTTP	EQU	5
+UPW_MAX		EQU	1200		; vueltas de medio segundo esperando a la Pico
 MEDIA_720K	EQU	0xF9
 MEDIA_360K	EQU	0xF8
 EST_ERROR	EQU	0		; bit del registro de estado
@@ -100,6 +119,10 @@ Commands:
 	DW	New
 	DB	"DRIVES",0
 	DW	Drives
+	DB	"BORRAR",0
+	DW	Borrar
+	DB	"UPDATE",0
+	DW	Update
 	DB	"/?",0
 	DW	Usage
 	DB	0
@@ -285,6 +308,300 @@ Drives:
 	CALL	PrChar
 	LD	HL,MsgDotCrLf
 	JP	Fail
+
+; SDF BORRAR: la red Wi-Fi y su clave, la URL de la camara y la ultima foto,
+; y la zona horaria vuelve a la de fabrica. Antes pregunta.
+Borrar:
+	CALL	NextArg
+	JP	NZ,Usage
+	LD	HL,MsgBorrar
+	CALL	PrStr
+	LD	C,0x08			; una tecla, sin eco (CTRL+C corta)
+	CALL	BDOS
+	CALL	PrChar
+	LD	HL,MsgCrLf
+	CALL	PrStr
+	AND	0xDF			; mayuscula
+	CP	'S'
+	LD	HL,MsgNoBorro
+	JP	NZ,Fail
+	DI
+	LD	A,CMD_SDFBORRAR
+	CALL	SendCmd
+	LD	A,SDFBORRAR_SI
+	OUT	(SDFDATA),A
+	CALL	Result
+	LD	HL,MsgBorrado
+	JP	Fail
+
+; SDF UPDATE [/F]: el ultimo firmware de GitHub (docs/ACTUALIZAR.md). La
+; Pico pregunta cual es; si es mas nuevo que el instalado (o con /F, aunque
+; no lo sea) pide confirmar, y la Pico lo baja, lo verifica, lo graba y se
+; reinicia. Las imagenes montadas vuelven solas (SDFPICO.CFG).
+Update:
+	XOR	A
+	LD	(Force),A
+	CALL	NextArg
+	JR	Z,UpAskGh
+	LD	HL,Arg
+	LD	DE,TxtForce
+	CALL	StrEq
+	JP	NZ,Usage
+	LD	A,1
+	LD	(Force),A
+	CALL	NextArg
+	JP	NZ,Usage
+UpAskGh:
+	LD	HL,MsgUpAsking		; "Preguntando a GitHub..."
+	CALL	PrStr
+	LD	A,ACT_CONSULTAR
+	CALL	UpStart
+	CALL	UpWait			; A = resultado
+	CALL	UpErr
+	LD	HL,MsgUpHave		; "Instalado: "
+	CALL	PrStr
+	LD	HL,UpBuf+9
+	CALL	PrZ
+	LD	HL,MsgUpGh		; "En GitHub: "
+	CALL	PrStr
+	LD	HL,UpBuf+9		; la segunda version, despues de la primera
+	XOR	A
+	LD	BC,20
+	CPIR
+	CALL	PrZ
+	LD	HL,MsgCrLf
+	CALL	PrStr
+	LD	A,(UpBuf+8)		; 1: la de GitHub es mas nueva
+	LD	HL,Force
+	OR	(HL)
+	LD	HL,MsgUpToDate
+	JP	Z,Fail
+	LD	HL,MsgUpSure
+	CALL	PrStr
+	LD	C,0x08			; una tecla, sin eco (CTRL+C corta)
+	CALL	BDOS
+	CALL	PrChar
+	LD	HL,MsgCrLf
+	CALL	PrStr
+	AND	0xDF			; mayuscula
+	CP	'S'
+	LD	HL,MsgUpNo
+	JP	NZ,Fail
+	LD	A,ACT_ACTUALIZAR
+	CALL	UpStart
+	CALL	UpWait			; vuelve solo si fallo: si no, va a UpDone
+	CALL	UpErr
+	LD	HL,MsgUpNo
+	JP	Fail
+
+; La Pico arranco con el firmware nuevo: su version, de la ultima consulta
+UpDone:
+	LD	HL,MsgUpDone		; "Listo. Ahora: SDF-Pico "
+	CALL	PrStr
+	LD	HL,UpBuf+9
+	CALL	PrZ
+	LD	HL,MsgDotCrLf
+	JP	Fail
+
+; UpStart, A = modo: CMD_UPDATE
+UpStart:
+	DI
+	PUSH	AF
+	LD	A,CMD_UPDATE
+	CALL	SendCmd
+	POP	AF
+	OUT	(SDFDATA),A
+	LD	A,ACT_SI
+	OUT	(SDFDATA),A
+	CALL	ReadByte
+	EI
+	OR	A
+	RET	Z
+	LD	HL,MsgUpBusy
+	CP	ACT_OCUPADA
+	JP	Z,Fail
+	LD	HL,MsgUpOld		; un firmware sin CMD_UPDATE no contesta
+	JP	Fail
+
+; UpWait: consulta cada medio segundo y muestra la fase, hasta que la Pico
+; termine (A = resultado) o se reinicie con el firmware nuevo (a UpDone)
+UpWait:
+	XOR	A
+	LD	(UpSeen),A
+	LD	(UpPhase),A
+	LD	HL,UPW_MAX
+	LD	(UpLeft),HL
+UWLoop:
+	CALL	UpPoll
+	EI
+	CP	0xFF			; la Pico no esta en el bus: reiniciandose
+	JR	Z,UWNext
+	CP	ACT_EN_CURSO
+	JR	Z,UWBusy
+	CP	ACT_LISTA
+	JR	Z,UWDone
+	LD	A,(UpSeen)		; LIBRE despues de en curso: arranco de nuevo
+	OR	A
+	JR	Z,UWNext
+	CALL	UpEndLine
+	JP	UpDone
+UWBusy:
+	LD	A,1
+	LD	(UpSeen),A
+	CALL	UpShow
+UWNext:
+	LD	B,25			; medio segundo (HALT espera la interrupcion del VDP)
+UWPause:
+	HALT
+	DJNZ	UWPause
+	LD	HL,(UpLeft)
+	DEC	HL
+	LD	(UpLeft),HL
+	LD	A,H
+	OR	L
+	JR	NZ,UWLoop
+	CALL	UpEndLine
+	LD	HL,MsgUpTime
+	JP	Fail
+UWDone:
+	CALL	UpEndLine
+	LD	A,(UpBuf+1)
+	RET
+
+; UpPoll: CMD_UPDPOLL en UpBuf (9 bytes y dos ASCIIZ); A = estado, o FFh si
+; la Pico no esta en el bus. Deja las interrupciones cortadas.
+UpPoll:
+	DI
+	IN	A,(SDFCMD)
+	CP	0xFF
+	RET	Z
+	LD	A,CMD_UPDPOLL
+	CALL	SendCmd
+	LD	B,4			; como Wait, pero sin salir si no esta
+	LD	DE,0
+UPReady:
+	IN	A,(SDFCMD)
+	CP	0xFF
+	RET	Z
+	AND	0x80
+	JR	Z,UPRead
+	DEC	DE
+	LD	A,D
+	OR	E
+	JR	NZ,UPReady
+	DJNZ	UPReady
+	LD	A,0xFF
+	RET
+UPRead:
+	LD	HL,UpBuf
+	LD	BC,9*256+SDFDATA
+	INIR
+	LD	B,16
+	CALL	ReadZ
+	INC	HL
+	LD	B,16
+	CALL	ReadZ
+	LD	A,(UpBuf)
+	RET
+
+; UpShow: la fase, si cambio; mientras baja, cuantos KB van
+UpShow:
+	LD	A,(UpBuf+1)
+	CP	ACT_BAJANDO
+	JR	Z,USDown
+	LD	HL,UpPhase
+	CP	(HL)
+	RET	Z
+	PUSH	AF
+	CALL	UpEndLine
+	POP	AF
+	LD	(UpPhase),A
+	LD	HL,MsgUpVerif		; "Verificando..."
+	CP	ACT_VERIFICANDO
+	JP	Z,PrStr
+	LD	HL,MsgUpWrite		; "Grabando: no apague el MSX."
+	CP	ACT_GRABANDO
+	JP	Z,PrStr
+	RET
+USDown:
+	LD	HL,(UpBuf+6)		; KB en total: 0 mientras baja la suma
+	LD	A,H
+	OR	L
+	RET	Z
+	LD	A,ACT_BAJANDO
+	LD	(UpPhase),A
+	LD	A,13
+	CALL	PrChar
+	LD	HL,MsgUpGot		; "Bajando "
+	CALL	PrStr
+	LD	HL,(UpBuf+4)
+	CALL	PrDec16
+	LD	HL,MsgUpOf		; " de "
+	CALL	PrStr
+	LD	HL,(UpBuf+6)
+	CALL	PrDec16
+	LD	HL,MsgUpKb		; " KB"
+	JP	PrStr
+
+; UpEndLine: termina la linea del avance, si quedo abierta
+UpEndLine:
+	LD	A,(UpPhase)
+	CP	ACT_BAJANDO
+	RET	NZ
+	XOR	A
+	LD	(UpPhase),A
+	LD	HL,MsgCrLf
+	JP	PrStr
+
+; UpErr, A = resultado de CMD_UPDPOLL: con 0 sigue; si no, el mensaje y al
+; DOS
+UpErr:
+	OR	A
+	RET	Z
+	CP	ACT_HTTP
+	JR	Z,UEHttp
+	CP	ACT_TLS
+	JR	Z,UETls
+	LD	HL,UpErrors
+	JP	CELoop
+UEHttp:
+	LD	HL,MsgUpHttp		; "GitHub contesto "
+	CALL	PrStr
+	LD	HL,(UpBuf+2)
+	CALL	PrDec16
+	LD	HL,MsgDotCrLf
+	JP	Fail
+UETls:
+	LD	HL,MsgUpTls		; "Fallo el TLS con GitHub (-0x"
+	CALL	PrStr
+	LD	HL,(UpBuf+2)
+	CALL	PrHex16
+	LD	HL,MsgUpTlsEnd		; ")."
+	JP	Fail
+
+UpErrors:
+	DB	1
+	DW	MsgUpNoWifi
+	DB	2
+	DW	MsgUpDns
+	DB	3
+	DW	MsgUpConn
+	DB	6
+	DW	MsgUpStop
+	DB	8
+	DW	MsgUpRam
+	DB	9
+	DW	MsgUpNoVer
+	DB	10
+	DW	MsgUpSize
+	DB	11
+	DW	MsgUpSum
+	DB	12
+	DW	MsgUpNotOurs
+	DB	13
+	DW	MsgUpFlash
+	DB	0xFF
+	DW	0
 
 ; SDF NEW X [360]
 New:
@@ -757,6 +1074,26 @@ PrDec16:
 	ADD	A,'0'
 	JP	PrChar
 
+PrHex16:
+	LD	A,H
+	CALL	PrHex8
+	LD	A,L
+PrHex8:
+	PUSH	AF
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	CALL	PrNibble
+	POP	AF
+PrNibble:
+	AND	0x0F
+	ADD	A,'0'
+	CP	'9'+1
+	JP	C,PrChar
+	ADD	A,7
+	JP	PrChar
+
 PrDigit:
 	XOR	A
 PrDigitSub:
@@ -786,7 +1123,9 @@ MsgUsage:	DB	"Uso: SDF              estado",13,10
 		DB	"     SDF MOUNT d: X   monta X.DSK",13,10
 		DB	"     SDF UMOUNT d:    desmonta",13,10
 		DB	"     SDF NEW X [360]  crea X.DSK",13,10
-		DB	"     SDF DRIVES n     unidades (1-2)",13,10,'$'
+		DB	"     SDF DRIVES n     unidades (1-2)",13,10
+		DB	"     SDF BORRAR       borra datos",13,10
+		DB	"     SDF UPDATE [/F]  firmware nuevo",13,10,'$'
 MsgNoPico:	DB	"No se detecta el SDF-Pico.",13,10,'$'
 MsgOldFw:	DB	"El firmware no tiene SDFINFO.",13,10,'$'
 MsgOneDrive:	DB	"El DOS ve una sola unidad.",13,10,'$'
@@ -794,6 +1133,45 @@ MsgNoImages:	DB	"No hay imagenes .DSK en la SD.",13,10,'$'
 MsgColon:	DB	": $"
 MsgEmpty:	DB	"sin imagen",13,10,'$'
 MsgDrives1:	DB	"Unidades del DOS al arrancar: $"
+MsgBorrar:	DB	"Se borran de la Pico la red Wi-Fi",13,10
+		DB	"y su clave, la URL de la camara y la",13,10
+		DB	"ultima foto. La zona horaria vuelve",13,10
+		DB	"a UTC-3. Seguro? (S/N) $"
+MsgNoBorro:	DB	"No se borro nada.",13,10,'$'
+MsgBorrado:	DB	"Datos borrados.",13,10,'$'
+MsgUpAsking:	DB	"Preguntando a GitHub...",13,10,'$'
+MsgUpHave:	DB	"Instalado: $"
+MsgUpGh:	DB	13,10,"En GitHub: $"
+MsgUpToDate:	DB	"Ya esta al dia.",13,10,'$'
+MsgUpSure:	DB	"La Pico lo baja, lo graba y se",13,10
+		DB	"reinicia. Seguro? (S/N) $"
+MsgUpNo:	DB	"No se cambio nada.",13,10,'$'
+MsgUpGot:	DB	"Bajando $"
+MsgUpOf:	DB	" de $"
+MsgUpKb:	DB	" KB $"
+MsgUpVerif:	DB	"Verificando...",13,10,'$'
+MsgUpWrite:	DB	"Grabando: no apague el MSX.",13,10,'$'
+MsgUpDone:	DB	"Listo. Ahora: SDF-Pico $"
+MsgUpBusy:	DB	"La Pico ya esta actualizando.",13,10,'$'
+MsgUpOld:	DB	"Este firmware no se actualiza solo:",13,10
+		DB	"grabe el .uf2 por USB (BOOTSEL).",13,10,'$'
+MsgUpTime:	DB	"La Pico no termino.",13,10,'$'
+MsgUpHttp:	DB	"GitHub contesto $"
+MsgUpTls:	DB	"Fallo el TLS con GitHub (-0x$"
+MsgUpTlsEnd:	DB	").",13,10,'$'
+MsgUpNoWifi:	DB	"La Pico no tiene Wi-Fi (WIFI.COM).",13,10,'$'
+MsgUpDns:	DB	"No se encontro GitHub (DNS).",13,10,'$'
+MsgUpConn:	DB	"Fallo la conexion con GitHub.",13,10,'$'
+MsgUpStop:	DB	"GitHub dejo de contestar.",13,10,'$'
+MsgUpRam:	DB	"No alcanzo la RAM de la Pico.",13,10,'$'
+MsgUpNoVer:	DB	"GitHub no dijo la version.",13,10,'$'
+MsgUpSize:	DB	"El firmware de GitHub no tiene",13,10
+		DB	"un tamano posible.",13,10,'$'
+MsgUpSum:	DB	"Lo bajado no coincide con su",13,10
+		DB	"suma SHA-256.",13,10,'$'
+MsgUpNotOurs:	DB	"Lo de GitHub no es un firmware",13,10
+		DB	"del SDF-Pico.",13,10,'$'
+MsgUpFlash:	DB	"Fallo la flash de la Pico.",13,10,'$'
 MsgCreating:	DB	"Creando $"
 MsgDots:	DB	"...",13,10,'$'
 MsgCreated:	DB	"Creada, de $"
@@ -814,6 +1192,7 @@ MsgNoSd:	DB	"No hay SD.",13,10,'$'
 
 Txt720:		DB	"720",0
 Txt360:		DB	"360",0
+TxtForce:	DB	"/F",0
 
 ArgPtr:		DW	0
 ArgLen:		DB	0
@@ -822,6 +1201,10 @@ Drive:		DB	0
 Cols:		DB	0
 Info:		DB	0
 Sec:		DB	0
+Force:		DB	0
+UpSeen:		DB	0
+UpPhase:	DB	0
+UpLeft:		DW	0
 
 ; Los buferes, despues del programa
 Arg		EQU	$
@@ -831,3 +1214,4 @@ InfoB		EQU	InfoA+ARGMAX+1
 Text		EQU	InfoB+ARGMAX+1
 SecBuf		EQU	Text+41
 List		EQU	SecBuf+512
+UpBuf		EQU	SecBuf			; CMD_UPDPOLL: SDF UPDATE no usa SecBuf

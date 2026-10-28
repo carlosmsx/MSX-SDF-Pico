@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PROTOCOL_VERSION  8   // el 7 del SDF-1, con registro de estado
-#define FW_VERSION        "SDF-Pico 0.12"
+#define FW_VERSION        "SDF-Pico 0.14"
 
 // Registro de estado, IN (01h). Ver docs/PROTOCOLO.md.
 #define EST_OCUPADO       0x80  // el firmware prepara la respuesta: no leer 00h
@@ -48,6 +48,8 @@
 #define CMD_CAMREAD       0xBB  // bloque (0-47); contesta 256 bytes de patrones y colores
 #define CMD_CAMURL        0xBC  // largo, URL; la guarda (largo 0 la olvida), contesta 0 o error
 #define CMD_CAMVER        0xBD  // contesta la URL guardada, sin la clave (ASCIIZ)
+#define CMD_UPDATE        0xBE  // modo, confirmacion; contesta 0 o error (actualizar.h)
+#define CMD_UPDPOLL       0xBF  // contesta estado, fase o resultado, detalle, KB, versiones
 
 // 0xDx: diagnostico
 // Archivos de la SD, para SD.COM y un explorador (archivos.h, docs/ARCHIVOS.md)
@@ -77,6 +79,8 @@
 #define CMD_SDFNEW        0xE4
 #define CMD_SDFDRIVES     0xE5
 #define CMD_SDFINFO       0xE6  // contesta drives, imagen de A: y de B: (ASCIIZ) (SDF.COM)
+#define CMD_SDFBORRAR     0xE7  // SDFBORRAR_SI; borra los datos personales, contesta 0 o error
+#define SDFBORRAR_SI      0x5A  // un byte suelto no tiene que alcanzar para borrar
 
 // 0xFx: driver de disco de MSX-DOS
 #define CMD_WRITE         0xF0

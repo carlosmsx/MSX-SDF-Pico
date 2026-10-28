@@ -29,6 +29,9 @@ set(FUENTES
     src/dispositivos.c
     src/camara.c
     src/sc2.c
+    src/https.c
+    src/raices.c
+    src/actualizar.c
     lib/fatfs/ff.c
     lib/fatfs/ffunicode.c
     lib/tjpgd/tjpgd.c
@@ -48,6 +51,10 @@ function(firmware nombre)
     target_include_directories(${nombre} PRIVATE lib/fatfs lib/tjpgd src)
     # Todo en RAM: el nucleo que atiende el bus no depende de la cache de flash.
     pico_set_binary_type(${nombre} copy_to_ram)
+    # Salvo mbedTLS, lwIP y el driver del CYW43, que quedan en la flash
+    # (ld/section_copy_to_ram_rodata.incl).
+    pico_add_linker_script_override_path(${nombre} ${CMAKE_CURRENT_LIST_DIR}/ld
+        FILES section_copy_to_ram_rodata.incl)
     # La consola va por el USB nativo: la UART0 queda para los perifericos.
     pico_enable_stdio_usb(${nombre} 1)
     pico_enable_stdio_uart(${nombre} 0)
@@ -60,6 +67,8 @@ function(firmware nombre)
         hardware_flash
         pico_cyw43_arch_lwip_threadsafe_background
         pico_lwip_sntp
+        pico_mbedtls
+        hardware_watchdog
     )
     pico_add_extra_outputs(${nombre})
 endfunction()

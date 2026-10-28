@@ -155,8 +155,9 @@ La respuesta la arma el núcleo 0, donde está el Wi-Fi. El núcleo 1 levanta
 núcleo 0 contesta, normalmente en menos de un milisegundo.
 
 Los comandos de `WIFI.COM` (0B5h a 0B8h, en `WIFI.md`) siguen el mismo camino
-por el núcleo 0; los de la cámara (0B9h a 0BDh, en `CAMARA.md`) se piden y
-se consultan, como el ping. `CMD_WIFIJOIN` lleva dos textos con su largo (la red y la
+por el núcleo 0; los de la cámara (0B9h a 0BDh, en `CAMARA.md`) y los de la
+actualización del firmware (0BEh y 0BFh, en `ACTUALIZAR.md`) se piden y se
+consultan, como el ping. `CMD_WIFIJOIN` lleva dos textos con su largo (la red y la
 clave), así que los parámetros de un comando pueden llegar a 100 bytes; los de
 `CMD_FSREN` (`ARCHIVOS.md`), con dos rutas, hasta 256.
 

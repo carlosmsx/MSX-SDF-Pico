@@ -105,6 +105,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | [docs/RELOJ.md](docs/RELOJ.md) | El reloj, la zona horaria y `OPEN "RTC:"` |
 | [docs/RED.md](docs/RED.md) | Conexión TCP para terminales (en desarrollo) |
 | [docs/CAMARA.md](docs/CAMARA.md) | Fotos de una cámara IP en SCREEN 2: `CAM.COM` (en desarrollo) |
+| [docs/ACTUALIZAR.md](docs/ACTUALIZAR.md) | El firmware nuevo desde GitHub, con `SDF UPDATE`, y cómo publicar un release |
 | [docs/VI.md](docs/VI.md) | `VI.COM`, un editor al estilo de vi para MSX-DOS 1 |
 | [docs/COMANDOS.md](docs/COMANDOS.md) | Utilidades de MSX-DOS 1: `GREP.COM`, `SLEEP.COM` y `REBOOT.COM` |
 | [docs/PROTOCOLO.md](docs/PROTOCOLO.md) | Protocolo entre la DiskROM y el firmware |
@@ -136,6 +137,7 @@ se incluye en el repositorio.
 | picotool y pioasm | 2.3.0 | Firmware | Lo instala la extensión |
 | Python | 3 | ROM, programas de DOS, `grabar.py` | [python.org](https://www.python.org/downloads/) |
 | pyserial | — | Solo `firmware/grabar.py` | `pip install pyserial` |
+| certifi | — | Solo `tools/raices.py` (las raíces del TLS) | `pip install certifi` |
 | GNU make | 4.4.1 | DiskROM | En Windows, por ejemplo `scoop install make` ([Scoop](https://scoop.sh/)) |
 | Nestor80 (N80 y LK80) | N80 1.3.6, LK80 1.1.1 | DiskROM | [Releases de Nestor80](https://github.com/Konamiman/Nestor80/releases) |
 | .NET | 6 | Nestor80 | [dotnet.microsoft.com](https://dotnet.microsoft.com/download/dotnet/6.0) |
@@ -173,6 +175,10 @@ conectada en modo BOOTSEL. `python firmware/grabar.py` lo hace sin el botón:
 reinicia la Pico en BOOTSEL abriendo su consola USB a 1200 baudios y copia el
 archivo (requiere pyserial). Actualizar el firmware no borra la red ni la zona
 horaria guardadas.
+
+Desde el firmware 0.14, la Pico también se actualiza sola desde los releases
+de GitHub, con `SDF UPDATE` en MSX-DOS. `python tools/release.py` junta los
+archivos de un release ([docs/ACTUALIZAR.md](docs/ACTUALIZAR.md)).
 
 Los programas de MSX-DOS de `comandos/` se ensamblan con
 `python tools/comandos.py` (PASMO), que los deja en `out/msx/` y arma
