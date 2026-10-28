@@ -94,3 +94,37 @@ Debe mostrar `1 2 4 8 16 32 64 128`: cada línea de datos, ida y vuelta.
   subida de `/RD`, y no antes.
 - En una escritura, que el byte informado por la consola coincida con el dato
   del bus durante todo el ciclo.
+
+## Prueba de lectura con RDTEST.COM
+
+```
+RDTEST [d:] [sector]
+```
+
+Pide el mismo sector 200 veces por los puertos, igual que el `DSKIO` de la
+DiskROM (`CMD_READ`, espera de OCUPADO y dos `INIR`), sin pasar por MSX-DOS ni
+por su búfer: sirve para fallas de lectura intermitentes, que un `DIR`
+repetido no muestra porque el DOS no siempre vuelve a leer el sector. `d:` es
+la unidad del SDF-Pico (`A:` si no se indica) y el sector, el 7 si no se
+indica: el primer sector del directorio de un disco de 720 KB.
+
+Las primeras 100 lecturas van con las interrupciones habilitadas y las otras
+100 sin. Cada una se compara con la primera y, si difiere, se muestra el
+número de lectura, el primer byte distinto y cuatro bytes de cada una:
+
+```
+A>RDTEST
+Sector 7 de A:, 2 x 100 lecturas
+vuelta @byte: llego / primera
+Con interrupciones:
+ 29 @157: 04 B2 8D 03 / BF 04 00 00
+...
+Con interrupciones: 3 de 100 mal
+Sin interrupciones: 0 de 100 mal
+```
+
+Si fallan casi todas, la mala fue la primera. Después de cada lectura el
+programa manda `CMD_DEBUG` con el XOR del sector, así que la consola USB
+muestra `checksum: MSX xx, Pico yy` por cada lectura que no coincide con lo
+que la Pico tenía en memoria. `RDTEST.COM` se arma con `python
+tools/comandos.py` junto con los demás y queda en `comandos.dsk`.

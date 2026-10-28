@@ -108,14 +108,14 @@ varios formatos. El detalle de cada función está en la documentación.
 | [docs/VI.md](docs/VI.md) | `VI.COM`, un editor al estilo de vi para MSX-DOS 1 |
 | [docs/COMANDOS.md](docs/COMANDOS.md) | Utilidades de MSX-DOS 1: `GREP.COM` |
 | [docs/PROTOCOLO.md](docs/PROTOCOLO.md) | Protocolo entre la DiskROM y el firmware |
-| [docs/PRUEBA-BUS.md](docs/PRUEBA-BUS.md) | Prueba del bus desde BASIC, sin DiskROM |
+| [docs/PRUEBA-BUS.md](docs/PRUEBA-BUS.md) | Prueba del bus desde BASIC, sin DiskROM, y `RDTEST.COM` para fallas de lectura |
 
 ## Estructura
 
 | Carpeta | Contenido |
 |---|---|
 | `diskrom/` | DiskROM (Z80), derivada de la del SDF-1 |
-| `comandos/` | Programas de MSX-DOS: `PING.COM`, `WIFI.COM`, `GET.COM`, `SDF.COM`, `SD.COM` y `CAM.COM`, que usan la Pico, y `VI.COM` y `GREP.COM` |
+| `comandos/` | Programas de MSX-DOS: `PING.COM`, `WIFI.COM`, `GET.COM`, `SDF.COM`, `SD.COM`, `CAM.COM` y `RDTEST.COM`, que usan la Pico, y `VI.COM` y `GREP.COM` |
 | `hardware/` | Modificación de la placa del SDF-1 y cableado de la Pico |
 | `firmware/` | Firmware de la Pico, en C con el pico-sdk |
 | `docs/` | Documentación de cada función y del protocolo |

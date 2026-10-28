@@ -13,7 +13,8 @@
 ; acceso si /IOSEL ya subio. Un ciclo de I/O real lo mantiene bajo >500 ns.
 ;
 ; Pines (ver pins.h): D0-D7 = GP0-7, /IOSEL = GP8, A0 = GP9, /RD = GP10.
-; Base de IN y de OUT en GP0, 8 pines de OUT, desplazamiento a la derecha.
+; Base de OUT en GP0, 8 pines, desplazamiento a la derecha. Base de IN en GP0
+; en sdf_bus y en GP8 (/IOSEL) en sdf_estado.
 
 .pio_version 1          ; RP2350: mov pindirs y mov osr, rxfifo[]
 
@@ -26,6 +27,13 @@
 ; con el FIFO vacio devuelven X, que vale FFh.
 ;
 ; jmp pin = /IOSEL. X = FFh, cargado desde el nucleo antes de arrancar.
+;
+; El fin del ciclo tambien se filtra: /IOSEL tiene que seguir alto ~210 ns
+; despues de subir. Al poner el byte en el bus, con varias lineas subiendo
+; juntas (00h -> BFh), aparecian pulsos en /RD y /IOSEL a mitad del ciclo: la
+; SM daba el ciclo por terminado, veia otro y sacaba un segundo byte en el
+; mismo IN, y todo lo que seguia llegaba corrido un byte. Entre dos ciclos de
+; I/O del Z80 hay por lo menos ~3 us, asi que la espera no molesta.
 ; ---------------------------------------------------------------------------
 .program sdf_bus
 .origin 0               ; out pc salta a direccion absoluta: la tabla va en 0-3
@@ -40,13 +48,6 @@ public entrada:
     mov osr, pins
     out null, 9         ; descarta D0-D7 y /IOSEL
     out pc, 2           ; salta segun A0 + 2 * /RD
-leer:
-    pull noblock        ; FIFO vacio: OSR = X (FFh)
-    out pins, 8
-    mov pindirs, ~null  ; el byte al bus
-    wait 1 gpio 10      ; /RD sube: el Z80 ya lo muestreo
-    mov pindirs, null
-    jmp fin
 escribir:
     ; Hay maquinas en las que el dato llega tarde al conector en un OUT.
     ; Se muestrea mientras /IOSEL este bajo y se guarda la ultima muestra
@@ -57,8 +58,17 @@ escribir:
     jmp escribir
 guardar:
     push noblock
+    jmp fin
+leer:
+    pull noblock        ; FIFO vacio: OSR = X (FFh)
+    out pins, 8
+    mov pindirs, ~null  ; el byte al bus hasta el fin del ciclo
 fin:
-    wait 1 gpio 8       ; fin del ciclo de I/O
+    wait 1 gpio 8 [31]  ; /IOSEL alto...
+    jmp pin suelta      ; ...y sigue alto ~210 ns despues: termino el ciclo
+    jmp fin             ; era un pulso: el ciclo sigue
+suelta:
+    mov pindirs, null   ; el '245 ya esta cerrado: soltar no apura al Z80
 .wrap
 
 ; ---------------------------------------------------------------------------
@@ -72,8 +82,7 @@ fin:
 .fifo txget
 .wrap_target
     wait 0 gpio 8 [15]  ; mismo filtro de pulsos que sdf_bus
-    mov osr, pins
-    out null, 8
+    mov osr, pins       ; la base de IN de esta SM es /IOSEL (GP8)
     out x, 3            ; /IOSEL + 2 * A0 + 4 * /RD
     jmp x!=y fin_est    ; solo IN (01h) con /IOSEL todavia bajo (Y = 2)
     mov osr, rxfifo[0]

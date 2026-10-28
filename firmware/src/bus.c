@@ -44,20 +44,26 @@ static uint sm_espia;           // solo con DIAGNOSTICO
 
 void bus_init(void)
 {
-    // Bus de datos: PIO, sin pulls (errata E9 del A2).
+    // Bus de datos: PIO, sin pulls (errata E9 del A2). Del lado B del '245
+    // solo hay entradas: flanco lento y 2 mA alcanzan y meten menos ruido
+    // en /IOSEL, A0 y /RD, que van en los pines de al lado.
     for (uint pin = PIN_D0; pin < PIN_D0 + 8; pin++) {
         if (SOLO_ESCUCHA)
             gpio_init(pin);
         else
             pio_gpio_init(pio, pin);
         gpio_disable_pulls(pin);
+        gpio_set_slew_rate(pin, GPIO_SLEW_RATE_SLOW);
+        gpio_set_drive_strength(pin, GPIO_DRIVE_STRENGTH_2MA);
     }
     pio_sm_set_consecutive_pindirs(pio, 0, PIN_D0, 8, false);
 
-    // /IOSEL, A0 y /RD: entradas. La PIO las lee sin importar la funcion.
+    // /IOSEL, A0 y /RD: entradas, con Schmitt. La PIO las lee sin importar
+    // la funcion.
     for (uint pin = PIN_IOSEL; pin <= PIN_RD; pin++) {
         gpio_init(pin);
         gpio_disable_pulls(pin);
+        gpio_set_input_hysteresis_enabled(pin, true);
     }
 
     // EN fijo en alto: el decodificador siempre habilitado.
@@ -79,7 +85,7 @@ void bus_init(void)
     pio_sm_init(pio, sm_bus, off_bus + sdf_bus_offset_entrada, &c);
 
     c = sdf_estado_program_get_default_config(off_est);
-    sm_config_set_in_pin_base(&c, PIN_D0);
+    sm_config_set_in_pin_base(&c, PIN_IOSEL);  // lee /IOSEL, A0 y /RD
     sm_config_set_out_pins(&c, PIN_D0, 8);
     sm_config_set_out_shift(&c, true, false, 32);
     pio_sm_init(pio, sm_est, off_est, &c);  // RX en modo GET, por .fifo txget
