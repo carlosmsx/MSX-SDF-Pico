@@ -43,6 +43,7 @@ Comandos:
 | 01h | ECO | Cada byte escrito en 00h se devuelve en la lectura siguiente |
 | 02h | CONTADOR | El DMA entrega 00h, 01h, ..., FFh en lecturas sucesivas de 00h |
 | 03h | NADA | Cancela el eco y el DMA |
+| 04h-06h | COPRO... | La Pico como coprocesador de juegos (ver `COPRO.md`) |
 
 ## Secuencia
 

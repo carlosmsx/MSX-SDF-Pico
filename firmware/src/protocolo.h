@@ -18,6 +18,10 @@
 #define CMD_ECO           0x01
 #define CMD_CONTADOR      0x02
 #define CMD_NADA          0x03
+// Coprocesador de juegos, prueba (copro.h, docs/COPRO.md)
+#define CMD_COPROBLQ      0x04  // n, semilla; contesta n bloques de 256 bytes
+#define CMD_COPROINI      0x05  // sprites; contesta el patron de 16x16 (32 bytes)
+#define CMD_COPROCUAD     0x06  // joystick, fila 8; contesta la tabla de sprites (128 bytes)
 
 // 0x9x: dispositivos de BASIC
 #define CMD_DEVNAME       0x90

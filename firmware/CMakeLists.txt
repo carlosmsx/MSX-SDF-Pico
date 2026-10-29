@@ -28,6 +28,7 @@ set(FUENTES
     src/reloj.c
     src/dispositivos.c
     src/camara.c
+    src/copro.c
     src/sc2.c
     src/https.c
     src/raices.c
