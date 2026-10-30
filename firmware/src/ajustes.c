@@ -5,9 +5,9 @@
 #include "hardware/sync.h"
 #include "ajustes.h"
 
-// Anteultimo sector de la flash (4 KB), lejos del programa, en tres
-// paginas: la red (el formato del firmware 0.4), la zona horaria y la URL de
-// la camara (desde el 0.11). Cada una con su marca y su suma: una pagina
+// Anteultimo sector de la flash (4 KB), lejos del programa, en cuatro
+// paginas: la red (el formato del firmware 0.4), la zona horaria, la URL de
+// la camara (desde el 0.11) y la del broker MQTT (desde el 0.16). Cada una con su marca y su suma: una pagina
 // borrada o vieja vale lo de fabrica.
 //
 // No el ultimo: todo .uf2 para RP2350 empieza con un bloque en 0x10FFFF00
@@ -23,6 +23,7 @@
 #define MARCA_RED       0x49464957u     // "WIFI"
 #define MARCA_ZONA      0x414E4F5Au     // "ZONA"
 #define MARCA_CAM       0x524D4143u     // "CAMR"
+#define MARCA_MQTT      0x5454514Du     // "MQTT"
 
 typedef struct {
     uint32_t marca;
@@ -43,9 +44,16 @@ typedef struct {
     uint32_t suma;
 } camara_t;
 
+typedef struct {
+    uint32_t marca;
+    char url[AJ_MQTT_MAX + 1];
+    uint32_t suma;
+} mqtt_t;
+
 static red_t red;
 static zona_t zona;
 static camara_t camara;
+static mqtt_t mqtt;
 
 static uint32_t suma_de(const void *datos, size_t n)
 {
@@ -61,6 +69,7 @@ void ajustes_leer(void)
     const red_t *r = (const red_t *)(XIP_BASE + OFFSET);
     const zona_t *z = (const zona_t *)(XIP_BASE + OFFSET + FLASH_PAGE_SIZE);
     const camara_t *c = (const camara_t *)(XIP_BASE + OFFSET + 2 * FLASH_PAGE_SIZE);
+    const mqtt_t *m = (const mqtt_t *)(XIP_BASE + OFFSET + 3 * FLASH_PAGE_SIZE);
 
     memset(&red, 0, sizeof red);
     if (r->marca == MARCA_RED && r->suma == suma_de(r, offsetof(red_t, suma))
@@ -76,11 +85,16 @@ void ajustes_leer(void)
     if (c->marca == MARCA_CAM && c->suma == suma_de(c, offsetof(camara_t, suma))
         && c->url[AJ_URL_MAX] == 0)
         camara = *c;
+
+    memset(&mqtt, 0, sizeof mqtt);
+    if (m->marca == MARCA_MQTT && m->suma == suma_de(m, offsetof(mqtt_t, suma))
+        && m->url[AJ_MQTT_MAX] == 0)
+        mqtt = *m;
 }
 
 static void grabar(void)
 {
-    static uint8_t paginas[3 * FLASH_PAGE_SIZE];
+    static uint8_t paginas[4 * FLASH_PAGE_SIZE];
     memset(paginas, 0xFF, sizeof paginas);
     if (red.ssid[0]) {
         red.marca = MARCA_RED;
@@ -94,6 +108,11 @@ static void grabar(void)
         camara.marca = MARCA_CAM;
         camara.suma = suma_de(&camara, offsetof(camara_t, suma));
         memcpy(paginas + 2 * FLASH_PAGE_SIZE, &camara, sizeof camara);
+    }
+    if (mqtt.url[0]) {
+        mqtt.marca = MARCA_MQTT;
+        mqtt.suma = suma_de(&mqtt, offsetof(mqtt_t, suma));
+        memcpy(paginas + 3 * FLASH_PAGE_SIZE, &mqtt, sizeof mqtt);
     }
 
     uint32_t ints = save_and_disable_interrupts();
@@ -122,6 +141,11 @@ int ajustes_zona(void)
 const char *ajustes_camara(void)
 {
     return camara.url;
+}
+
+const char *ajustes_mqtt(void)
+{
+    return mqtt.url;
 }
 
 void ajustes_poner_red(const char *ssid, const char *clave)
@@ -156,10 +180,20 @@ void ajustes_poner_camara(const char *url)
     grabar();
 }
 
+void ajustes_poner_mqtt(const char *url)
+{
+    if (strcmp(url, mqtt.url) == 0)
+        return;
+    memset(&mqtt, 0, sizeof mqtt);
+    strncpy(mqtt.url, url, AJ_MQTT_MAX);
+    grabar();
+}
+
 void ajustes_borrar(void)
 {
     memset(&red, 0, sizeof red);
     memset(&camara, 0, sizeof camara);
+    memset(&mqtt, 0, sizeof mqtt);
     zona.minutos = AJ_ZONA_INICIAL;
 
     // Sin grabar nada despues: el sector queda en FFh, como una Pico nueva

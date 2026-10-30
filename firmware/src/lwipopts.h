@@ -46,4 +46,10 @@
 #include <stdint.h>
 void reloj_internet(uint32_t utc);
 #define SNTP_SET_SYSTEM_TIME(sec)   reloj_internet(sec)
-#define MEMP_NUM_SYS_TIMEOUT        (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 2)
+#define MEMP_NUM_SYS_TIMEOUT        (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 3)
+
+// MQTT (mqtt.c): una publicacion entera tiene que entrar en el anillo de
+// salida, y el topico de lo que llega en el bufer de encabezado.
+#define MQTT_OUTPUT_RINGBUF_SIZE    1024
+#define MQTT_VAR_HEADER_BUFFER_LEN  300
+#define MQTT_REQ_MAX_IN_FLIGHT      8

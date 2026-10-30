@@ -1,0 +1,34 @@
+/* Reemplaza al del SDK (pico_add_linker_script_override_path en
+   CMakeLists.txt). Igual que el original, mas la seccion .anillo: el anillo
+   DMA del bus (bus.c), alineado a su tamano, en los ultimos 32 KB de la RAM.
+   El heap termina donde empieza.
+
+   En la .bss, la alineacion de 32 KB del anillo alineaba toda la seccion:
+   segun donde terminaran .text y .data, se perdian hasta 32 KB entre las
+   dos. Asi no se pierde nada. Si la .bss crece hasta el anillo, el linker
+   avisa que las secciones se pisan.
+
+   Defines the following symbols for use by code:
+    __HeapLimit
+*/
+
+SECTIONS
+{
+    .dummy_pre_heap (NOLOAD):
+    {
+        /* Dummy section to make sure we're back in normal RAM for the heap when HEAP_LOC isn't defined */
+        . = .;
+    } > RAM
+    .heap DEFINED(HEAP_LOC) ? HEAP_LOC : . (NOLOAD):
+    {
+        __end__ = .;
+        end = __end__;
+        KEEP(*(.heap*))
+    } > RAM
+    .anillo ORIGIN(RAM) + LENGTH(RAM) - 0x8000 (NOLOAD):
+    {
+        KEEP(*(.anillo*))
+    } > RAM
+    ASSERT(SIZEOF(.anillo) <= 0x8000, ".anillo: el anillo del bus no entra en 32 KB")
+    __HeapLimit = ADDR(.anillo);
+}

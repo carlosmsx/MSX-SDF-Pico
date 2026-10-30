@@ -105,6 +105,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | [docs/RELOJ.md](docs/RELOJ.md) | El reloj, la zona horaria y `OPEN "RTC:"` |
 | [docs/RED.md](docs/RED.md) | Conexión TCP para terminales (en desarrollo) |
 | [docs/CAMARA.md](docs/CAMARA.md) | Fotos de una cámara IP en SCREEN 2: `CAM.COM` (en desarrollo) |
+| [docs/MQTT.md](docs/MQTT.md) | Mensajes MQTT (domótica, chat entre MSX): `MQTT.COM` (en desarrollo) |
 | [docs/ACTUALIZAR.md](docs/ACTUALIZAR.md) | El firmware nuevo desde GitHub, con `SDF UPDATE`, y cómo publicar un release |
 | [docs/COPRO.md](docs/COPRO.md) | La Pico como coprocesador de juegos: `COPRO.COM` (prueba) |
 | [docs/VI.md](docs/VI.md) | `VI.COM`, un editor al estilo de vi para MSX-DOS 1 |
@@ -117,7 +118,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | Carpeta | Contenido |
 |---|---|
 | `diskrom/` | DiskROM (Z80), derivada de la del SDF-1 |
-| `comandos/` | Programas de MSX-DOS: `PING.COM`, `WIFI.COM`, `GET.COM`, `SDF.COM`, `SD.COM`, `CAM.COM`, `COPRO.COM` y `RDTEST.COM`, que usan la Pico, y `VI.COM`, `GREP.COM`, `SLEEP.COM` y `REBOOT.COM` |
+| `comandos/` | Programas de MSX-DOS: `PING.COM`, `WIFI.COM`, `GET.COM`, `SDF.COM`, `SD.COM`, `CAM.COM`, `MQTT.COM`, `COPRO.COM` y `RDTEST.COM`, que usan la Pico, y `VI.COM`, `GREP.COM`, `SLEEP.COM` y `REBOOT.COM` |
 | `hardware/` | Modificación de la placa del SDF-1 y cableado de la Pico |
 | `firmware/` | Firmware de la Pico, en C con el pico-sdk |
 | `docs/` | Documentación de cada función y del protocolo |

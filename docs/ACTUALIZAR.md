@@ -74,8 +74,9 @@ El firmware se copia entero a la RAM al arrancar (`copy_to_ram`), salvo
 mbedTLS, lwIP, el Wi-Fi y la conversión de la cámara, que corren desde la
 flash para dejarle RAM al TLS (`firmware/ld/`). Es todo código del núcleo 0, y
 el núcleo 0 no ejecuta nada de la flash mientras la graba. El búfer de
-entrada del TLS (16 KB) va en el de la conversión de la cámara: las dos cosas
-nunca pasan a la vez.
+entrada del TLS (16 KB) va en el de la conversión de la cámara: la
+actualización y la foto nunca pasan a la vez. Una foto por HTTPS, que
+convierte mientras lee, pide ese búfer a la RAM libre (`CAMARA.md`).
 
 ## Publicar un release
 

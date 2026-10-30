@@ -2,7 +2,7 @@
 // CMD_CAMREAD y CMD_CAMURL, docs/CAMARA.md).
 //
 // El nucleo 1 pide y consulta, como en ping.h. El nucleo 0 baja el JPEG por
-// HTTP, lo decodifica a medida que llega (TJpgDec), lo lleva a 256x192 y
+// HTTP o HTTPS (https.c), lo decodifica a medida que llega (TJpgDec), lo lleva a 256x192 y
 // elige, para cada tramo de 8x1 pixeles, el par de colores del TMS9918 que
 // mejor lo representa, con difusion de error. Es el algoritmo de
 // tools/jpg2sc2.py. El resultado son las tablas de patrones y de colores de
@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define CAM_URL_MAX     200     // http://usuario:clave@host:puerto/ruta
+#define CAM_URL_MAX     200     // http://usuario:clave@host:puerto/ruta, o https://host/ruta
 #define CAM_PANTALLA    12288   // patrones (6144) y colores (6144)
 #define CAM_BLOQUE      256     // lo que entrega cada CMD_CAMREAD
 #define CAM_BLOQUES     (CAM_PANTALLA / CAM_BLOQUE)
@@ -20,7 +20,8 @@
 // Respuesta de CMD_CAMSHOT y CMD_CAMURL
 #define CAM_PEDIDO_OK   0
 #define CAM_OCUPADA     1       // hay una foto en curso
-#define CAM_URL_MAL     2       // no es http://[usuario:clave@]host[:puerto]/ruta, o es larga
+#define CAM_URL_MAL     2       // no es http://[usuario:clave@]host[:puerto]/ruta ni
+                                // https://host[:puerto]/ruta, o es larga
 
 // Estado de CMD_CAMPOLL, primer byte de la respuesta
 #define CAM_LIBRE       0       // no se pidio nada
@@ -37,6 +38,8 @@
 #define CAM_TAMANO      6       // la imagen es demasiado grande o demasiado chica
 #define CAM_TIEMPO      7       // la camara dejo de mandar
 #define CAM_SIN_URL     8       // no hay URL guardada
+#define CAM_TLS         9       // fallo el HTTPS (o el certificado): el error de mbedTLS en el detalle
+#define CAM_MEMORIA     10      // no alcanzo la RAM para el HTTPS
 
 #define CAM_ESPERA_MS   8000    // sin recibir nada, se abandona
 

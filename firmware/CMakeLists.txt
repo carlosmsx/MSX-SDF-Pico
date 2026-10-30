@@ -33,6 +33,8 @@ set(FUENTES
     src/https.c
     src/raices.c
     src/actualizar.c
+    src/mqtt.c
+    src/mqtt_red.c
     lib/fatfs/ff.c
     lib/fatfs/ffunicode.c
     lib/tjpgd/tjpgd.c
@@ -55,7 +57,7 @@ function(firmware nombre)
     # Salvo mbedTLS, lwIP y el driver del CYW43, que quedan en la flash
     # (ld/section_copy_to_ram_rodata.incl).
     pico_add_linker_script_override_path(${nombre} ${CMAKE_CURRENT_LIST_DIR}/ld
-        FILES section_copy_to_ram_rodata.incl)
+        FILES section_copy_to_ram_rodata.incl section_heap.incl)
     # La consola va por el USB nativo: la UART0 queda para los perifericos.
     pico_enable_stdio_usb(${nombre} 1)
     pico_enable_stdio_uart(${nombre} 0)
@@ -68,6 +70,7 @@ function(firmware nombre)
         hardware_flash
         pico_cyw43_arch_lwip_threadsafe_background
         pico_lwip_sntp
+        pico_lwip_mqtt
         pico_mbedtls
         hardware_watchdog
     )

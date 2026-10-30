@@ -8,6 +8,7 @@
 #include "lwip/tcp.h"
 #include "ajustes.h"
 #include "camara.h"
+#include "https.h"
 #include "sc2.h"
 #include "wifi.h"
 
@@ -16,12 +17,14 @@
 
 // ---- URL ----
 //
-// http://[usuario:clave@]host[:puerto]/ruta, sin el http:// tambien. Se
-// revisa en el nucleo 1 (al pedir) y se usa en el 0.
+// http://[usuario:clave@]host[:puerto]/ruta, sin el http:// tambien, o
+// https://host[:puerto]/ruta (sin usuario: https.c no lo manda). Se revisa
+// en el nucleo 1 (al pedir) y se usa en el 0.
 
 typedef struct {
     char host[HOST_MAX + 1];
     uint16_t puerto;
+    bool tls;                   // https://
     const char *ruta;           // dentro de la URL; "" es "/"
     const char *usuario;        // dentro de la URL, hasta la @; NULL sin usuario
     int n_usuario;
@@ -30,10 +33,14 @@ typedef struct {
 static bool url_partir(const char *url, url_t *u)
 {
     const char *p = url;
+    u->tls = false;
     if (strncmp(p, "http://", 7) == 0)
         p += 7;
-    else if (strstr(p, "://"))
-        return false;           // https:// u otro
+    else if (strncmp(p, "https://", 8) == 0) {
+        p += 8;
+        u->tls = true;
+    } else if (strstr(p, "://"))
+        return false;           // otro protocolo
     const char *fin = p + strcspn(p, "/");
     const char *arroba = NULL;
     for (const char *q = p; q < fin; q++)
@@ -41,6 +48,8 @@ static bool url_partir(const char *url, url_t *u)
             arroba = q;
     u->usuario = NULL;
     u->n_usuario = 0;
+    if (arroba && u->tls)
+        return false;
     if (arroba) {
         u->usuario = p;
         u->n_usuario = arroba - p;
@@ -52,7 +61,7 @@ static bool url_partir(const char *url, url_t *u)
         return false;
     memcpy(u->host, p, fin_host - p);
     u->host[fin_host - p] = 0;
-    u->puerto = 80;
+    u->puerto = u->tls ? 443 : 80;
     if (dos) {
         long n = 0;
         for (const char *q = dos + 1; q < fin; q++) {
@@ -207,6 +216,7 @@ static volatile bool conectada, cerrada, resuelto;
 static ip_addr_t ip;
 static volatile uint32_t t_ultimo;      // ms de lo ultimo recibido
 static bool sin_tiempo;                 // se espero CAM_ESPERA_MS sin recibir
+static bool por_https;                  // la foto en curso va por https.c
 
 static err_t al_recibir(void *arg, struct tcp_pcb *p, struct pbuf *q, err_t err)
 {
@@ -252,6 +262,11 @@ static void al_resolver(const char *nombre, const ip_addr_t *dir, void *arg)
 
 static void cortar(void)
 {
+    if (por_https) {
+        https_cerrar();
+        por_https = false;
+        return;
+    }
     cyw43_arch_lwip_begin();
     if (pcb) {
         tcp_arg(pcb, NULL);
@@ -332,6 +347,75 @@ static uint32_t ahora_ms(void)
 
 static uint32_t t_inicio, t_respuesta;  // al pedir; ms hasta la respuesta
 
+// ---- HTTPS ----
+//
+// La conexion, el TLS y las redirecciones los hace https.c; aca se convierte
+// lo que entrega https_leer. El bufer de entrada del TLS no puede ir en la
+// banda de sc2.c, que se usa mientras llega la foto: sale de la RAM libre. El
+// certificado no se verifica (https_camara): sirve cualquier servidor, y lo
+// peor que puede hacer uno falso es mostrar otra foto.
+
+static int err_https;           // el error de https_leer (HTTPS_...), o 0
+
+static size_t tomar_https(void *ctx, uint8_t *buf, size_t n)
+{
+    (void)ctx;
+    uint8_t tirar[64];
+    if (!buf) {
+        buf = tirar;
+        if (n > sizeof tirar)
+            n = sizeof tirar;
+    }
+    if (n > 0x7FFF)
+        n = 0x7FFF;
+    int m = https_leer(buf, (int)n);
+    if (m < 0) {
+        err_https = -m;
+        return 0;
+    }
+    return m;
+}
+
+static uint8_t de_https(int r)
+{
+    detalle = (uint16_t)https_detalle;
+    switch (r) {
+    case HTTPS_OK:          return CAM_OK;
+    case HTTPS_SIN_WIFI:    return CAM_SIN_WIFI;
+    case HTTPS_NOMBRE:      return CAM_NOMBRE;
+    case HTTPS_TLS:         return CAM_TLS;
+    case HTTPS_HTTP:        return CAM_HTTP;
+    case HTTPS_TIEMPO:      return CAM_TIEMPO;
+    case HTTPS_URL:         return CAM_SIN_URL;     // una redireccion que no sirve
+    case HTTPS_MEMORIA:     return CAM_MEMORIA;
+    default:                return CAM_CONEXION;
+    }
+}
+
+static uint8_t capturar_https(const char *url_txt)
+{
+    int32_t largo;
+    por_https = true;
+    err_https = 0;
+    https_camara(true);
+    int r = https_get(url_txt, &largo);
+    https_camara(false);
+    if (r != HTTPS_OK)
+        return de_https(r);
+    t_respuesta = ahora_ms() - t_inicio;
+
+    uint8_t jres;
+    int s = sc2_convertir(tomar_https, NULL, pantalla, &ancho, &alto, &jres);
+    if (s == SC2_TAMANO)
+        return CAM_TAMANO;
+    if (s != SC2_OK && err_https)
+        return de_https(err_https);
+    // https_leer avisa si se corto antes de tiempo: lo demas es que no
+    // llego un JPEG (una pagina, por ejemplo)
+    detalle = jres;
+    return s == SC2_OK ? CAM_OK : CAM_JPEG;
+}
+
 static uint8_t capturar(const char *url_txt)
 {
     url_t u;
@@ -344,6 +428,8 @@ static uint8_t capturar(const char *url_txt)
         return CAM_SIN_URL;
     if (wifi_estado() != WIFI_CONECTADO)
         return CAM_SIN_WIFI;
+    if (u.tls)
+        return capturar_https(url_txt);
     strcpy(host, u.host);
 
     // El pedido
@@ -471,9 +557,10 @@ static void informar(void)
         [CAM_HTTP] = "la camara contesto", [CAM_JPEG] = "JPEG que no se entiende, error",
         [CAM_TAMANO] = "tamano no soportado", [CAM_TIEMPO] = "la camara dejo de mandar",
         [CAM_SIN_URL] = "no hay URL (o no es valida)",
+        [CAM_TLS] = "fallo el HTTPS, error de mbedTLS", [CAM_MEMORIA] = "no alcanzo la RAM para el HTTPS",
     };
     printf("camara: %s", res < sizeof que / sizeof que[0] ? que[res] : "?");
-    if (res == CAM_HTTP || res == CAM_JPEG)
+    if (res == CAM_HTTP || res == CAM_JPEG || res == CAM_TLS || (res == CAM_CONEXION && detalle))
         printf(" %u", detalle);
     if (ancho)
         printf(", %ux%u", ancho, alto);
@@ -512,6 +599,14 @@ bool cam_comando(const char *linea_txt)
         printf("camara: %s\n", u[0] ? u : "(sin URL: CAM /U desde MSX-DOS)");
         if (estado == CAM_LISTA)
             informar();
+        return true;
+    }
+    if (strncmp(linea_txt, "camara url ", 11) == 0) {
+        const char *u = linea_txt + 11;
+        int n = strcmp(u, "-") == 0 ? 0 : (int)strlen(u);
+        uint8_t r = cam_guardar_url(u, n);
+        printf("camara: %s\n", r == CAM_PEDIDO_OK ? (n ? "URL guardada" : "URL olvidada")
+               : r == CAM_URL_MAL ? "URL no valida" : "ocupada, probar de nuevo");
         return true;
     }
     if (strcmp(linea_txt, "camara foto") == 0) {

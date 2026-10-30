@@ -6,7 +6,8 @@
 //
 // La pantalla sale de /cam.bin (los 12 KB que arma firmware/src/sc2.c,
 // compilado en la PC). Cada foto tarda 8 consultas. Segun la URL:
-// "noexiste" no resuelve, "clave-mal" contesta 401, "grande" es muy grande.
+// "noexiste" no resuelve, "clave-mal" contesta 401, "grande" es muy grande,
+// "tls-mal" falla el TLS, "sin-ram" no alcanza la RAM del HTTPS.
 //
 //   await cam.cargar('/cam.bin'); boot(); typ("b:\r", 100); typ("cam\r", 2000)
 //   cam.log        los pedidos que llegaron
@@ -32,13 +33,15 @@
             const u = txt(p, 1, p[0]) || C.url;
             C.log.push('SHOT ' + u);
             if (C.estado === 1) { q.push(1); break; }
-            if (p[0] && !/^(http:\/\/)?[^\/]+/.test(u) || /^https:/.test(u)) { q.push(2); break; }
+            if (p[0] && !/^(https?:\/\/)?[^\/]+/.test(u) || /^https:\/\/[^\/]*@/.test(u)) { q.push(2); break; }
             C.estado = 1; C.polls = 8;
             C.det = 0; C.w = 704; C.h = 576; C.ms = 1234; C.res = 0;
             if (!u) { C.res = 8; C.w = C.h = 0; }
             else if (/noexiste/.test(u)) { C.res = 2; C.w = C.h = 0; }
             else if (/clave-mal/.test(u)) { C.res = 4; C.det = 401; C.w = C.h = 0; }
             else if (/grande/.test(u)) { C.res = 6; C.w = 8000; C.h = 6000; }
+            else if (/tls-mal/.test(u)) { C.res = 9; C.det = 30592; C.w = C.h = 0; }
+            else if (/sin-ram/.test(u)) { C.res = 10; C.w = C.h = 0; }
             q.push(0);
             break;
         }

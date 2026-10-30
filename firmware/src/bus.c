@@ -36,7 +36,9 @@ static PIO pio = pio0;
 static uint sm_bus, sm_est;
 static uint off_bus, off_est;
 static int dma_rx, dma_tx;
-static uint32_t rx_anillo[RX_PALABRAS] __attribute__((aligned(1u << RX_BITS)));
+// Va en los ultimos 32 KB de la RAM (ld/section_heap.incl): en la .bss, su
+// alineacion empujaba toda la seccion y se perdian hasta 32 KB de heap.
+static uint32_t rx_anillo[RX_PALABRAS] __attribute__((section(".anillo"), aligned(1u << RX_BITS)));
 static uint32_t rx_leido;       // indice de la proxima palabra a leer
 
 static PIO pio_espia = pio1;

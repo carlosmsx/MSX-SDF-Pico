@@ -25,6 +25,7 @@
 #include "wifi_dos.h"
 #include "ajustes.h"
 #include "menu_wifi.h"
+#include "mqtt.h"
 #include "reloj.h"
 #include "wifi.h"
 
@@ -65,7 +66,7 @@ static bool leer_zona(const char *txt, int *minutos)
 static void comando(const char *linea)
 {
     if (linea[0] == 0 || wifi_comando(linea) || red_comando(linea) || cam_comando(linea)
-        || act_comando(linea))
+        || act_comando(linea) || mqtt_comando(linea))
         return;
     if (strcmp(linea, "hora") == 0) {
         mostrar_hora();
@@ -73,7 +74,7 @@ static void comando(const char *linea)
     }
     if (strcmp(linea, "borrar todo") == 0) {
         wdos_borrar();
-        printf("borrados la red, la URL de la camara y la ultima foto; zona UTC-3\n");
+        printf("borrados la red, la URL de la camara, la ultima foto y el broker MQTT; zona UTC-3\n");
         return;
     }
     if (strncmp(linea, "zona ", 5) == 0) {
@@ -101,10 +102,15 @@ static void comando(const char *linea)
            "  zona <h>      zona horaria: zona -3, zona +5:30\n"
            "  camara        URL de la camara (sin la clave) y la ultima foto\n"
            "  camara foto   saca una foto con la URL guardada y dice cuanto tardo\n"
+           "  camara url <URL>  guarda la URL de la camara (camara url -: la olvida)\n"
+           "  mqtt          broker guardado, estado y suscripciones; mqtt url <URL>,\n"
+           "                mqtt conectar [URL], mqtt sub/unsub <topico>,\n"
+           "                mqtt pub <topico> <texto>, mqtt traza, mqtt cerrar\n"
            "  actualizar    pregunta a GitHub cual es el ultimo firmware\n"
            "  actualizar si lo baja, lo verifica, lo graba y reinicia (SDF UPDATE)\n"
-           "  borrar todo   borra la red, su clave, la URL de la camara y la ultima\n"
-           "                foto, y vuelve la zona a UTC-3 (SDF BORRAR en MSX-DOS)\n");
+           "  borrar todo   borra la red, su clave, la URL de la camara, la ultima\n"
+           "                foto y el broker MQTT, y vuelve la zona a UTC-3\n"
+           "                (SDF BORRAR en MSX-DOS)\n");
 }
 
 int main(void)
@@ -113,6 +119,7 @@ int main(void)
     ajustes_leer();
     reloj_init(ajustes_zona());
     cam_iniciar();
+    mqtt_iniciar();
     bus_init();
     multicore_launch_core1(protocolo_core1);
 
@@ -129,6 +136,7 @@ int main(void)
         wdos_tarea();
         cam_tarea();
         act_tarea();
+        mqtt_tarea();
         const char *linea = consola_linea(wifi_pide_clave());
         if (linea)
             comando(linea);

@@ -3,6 +3,7 @@
 #include "hardware/sync.h"
 #include "ajustes.h"
 #include "camara.h"
+#include "mqtt.h"
 #include "protocolo.h"
 #include "red.h"
 #include "reloj.h"
@@ -126,6 +127,7 @@ void wdos_borrar(void)
     wifi_olvidar();
     red_conectar("", 0);
     cam_olvidar();
+    mqtt_olvidar();
     ajustes_borrar();
     reloj_poner_zona(ajustes_zona());
 }

@@ -1,13 +1,16 @@
-// GET por HTTPS, para bajar el firmware de GitHub (actualizar.c). Nucleo 0,
-// desde el bucle principal: cada funcion espera hasta terminar.
+// GET por HTTPS, para bajar el firmware de GitHub (actualizar.c) y las fotos
+// de las camaras (camara.c). Nucleo 0, desde el bucle principal: cada
+// funcion espera hasta terminar.
 //
 // TCP como en camara.c (lwIP en las interrupciones, lo recibido en cola de
 // pbuf hasta que se lee) y TLS 1.2 con mbedTLS encima, en el bucle. El
 // servidor se reconoce con los certificados de raices.h y su nombre. Sigue
 // las redirecciones (los archivos de un release estan en otro servidor).
 //
-// mbedTLS pide unos 40 KB de la RAM libre (malloc) por conexion, y los
-// devuelve al cerrar.
+// mbedTLS pide unos 40 KB por conexion, y los devuelve al cerrar. El bufer
+// de entrada (16 KB) va prestado en la banda de sc2.c y lo demas sale de la
+// RAM libre (malloc); la camara, que usa la banda mientras lee, lo pide todo
+// a la RAM libre (https_camara).
 
 #pragma once
 #include <stdbool.h>
@@ -40,3 +43,9 @@ int https_get(const char *url, int32_t *largo);
 int https_leer(uint8_t *buf, int n);
 
 void https_cerrar(void);
+
+// true: las conexiones siguientes son de la camara. No usan la banda de
+// sc2.c (la necesita para convertir lo que llega) y no verifican el
+// certificado: la foto es publica y no se manda nada secreto, y asi sirve
+// cualquier servidor. false, lo de siempre (SDF UPDATE verifica).
+void https_camara(bool si);

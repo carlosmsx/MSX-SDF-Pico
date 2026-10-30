@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PROTOCOL_VERSION  8   // el 7 del SDF-1, con registro de estado
-#define FW_VERSION        "SDF-Pico 0.14"
+#define FW_VERSION        "SDF-Pico 0.17"
 
 // Registro de estado, IN (01h). Ver docs/PROTOCOLO.md.
 #define EST_OCUPADO       0x80  // el firmware prepara la respuesta: no leer 00h
@@ -36,6 +36,15 @@
 #define CMD_RTCGET        0xA1
 #define CMD_RTCSETDA      0xA2
 #define CMD_RTCSETTI      0xA3
+
+// MQTT (mqtt.h, docs/MQTT.md)
+#define CMD_MQTTCONN      0xA8  // largo, URL (0: la guardada); contesta 0 o error
+#define CMD_MQTTCLOSE     0xA9  // desconecta y olvida las suscripciones; contesta 0
+#define CMD_MQTTSUB       0xAA  // modo, largo, topico; contesta 0 o error
+#define CMD_MQTTPUB       0xAB  // flags, largo, topico, largo, texto; contesta 0 o error
+#define CMD_MQTTPOLL      0xAC  // modo; contesta estado, motivo y, si hay, un mensaje
+#define CMD_MQTTURL       0xAD  // largo, URL; la guarda (largo 0 la olvida), contesta 0 o error
+#define CMD_MQTTVER       0xAE  // contesta la URL guardada, sin la clave (ASCIIZ)
 
 // 0xBx: red
 #define CMD_WIFIMENU      0xB0  // tecla, ancho, filas; contesta fin y texto (menu_wifi.h)

@@ -35,7 +35,8 @@ CAM_LISTA	EQU	2
 CAM_HTTP	EQU	4
 CAM_JPEG	EQU	5
 CAM_TAMANO	EQU	6
-CAM_ERRORES	EQU	9		; resultados conocidos (0 a 8)
+CAM_TLS		EQU	9
+CAM_ERRORES	EQU	11		; resultados conocidos (0 a 10)
 BLOQUES		EQU	48		; de 256 bytes: 24 de patrones y 24 de colores
 
 	ORG	0x0100
@@ -383,6 +384,8 @@ ShotSent:
 	JR	Z,ErrJpeg
 	CP	CAM_TAMANO
 	JR	Z,ErrSize
+	CP	CAM_TLS
+	JR	Z,ErrTls
 	CP	CAM_ERRORES
 	JR	C,ErrTable
 	XOR	A
@@ -414,6 +417,14 @@ ErrHttp:
 ErrJpeg:
 	CALL	LeaveGfx
 	LD	HL,MsgJpeg		; "...(error "
+	CALL	PrStr
+	LD	HL,(PollBuf+2)
+	CALL	PrDec16
+	LD	HL,MsgParen		; ")."
+	JP	Fail
+ErrTls:
+	CALL	LeaveGfx
+	LD	HL,MsgTls		; "...(error "
 	CALL	PrStr
 	LD	HL,(PollBuf+2)
 	CALL	PrDec16
@@ -916,13 +927,15 @@ MsgUsage:	DB	"Uso: CAM [/C] [/F archivo] [URL]",13,10
 		DB	"      olvida y sin URL la muestra",13,10
 		DB	"Sin URL usa la guardada. La URL:",13,10
 		DB	"http://usuario:clave@ip:puerto/ruta",13,10
-		DB	"(sin :puerto va al 80)",13,10,'$'
+		DB	"(sin :puerto va al 80) o",13,10
+		DB	"https://servidor/ruta",13,10,'$'
 MsgNoPico:	DB	"No se detecta el SDF-Pico.",13,10,'$'
 MsgOldFw:	DB	"El firmware de la Pico no maneja la",13,10
 		DB	"camara (hace falta el 0.11).",13,10,'$'
 MsgShooting:	DB	"Sacando la foto...",13,10,'$'
-MsgBadUrl:	DB	"URL no valida (y sin HTTPS):",13,10
-		DB	"http://usuario:clave@ip/ruta",13,10,'$'
+MsgBadUrl:	DB	"URL no valida: http://usuario:clave",13,10
+		DB	"@ip/ruta o https://servidor/ruta",13,10
+		DB	"(HTTPS desde el firmware 0.15).",13,10,'$'
 MsgCancel:	DB	"Cancelado.",13,10,'$'
 MsgPicoTime:	DB	"La Pico no termino la foto.",13,10,'$'
 MsgUnknown:	DB	"Error desconocido de la Pico.",13,10,'$'
@@ -932,6 +945,8 @@ MsgNoHost:	DB	"No se encontro la camara (nombre).",13,10,'$'
 MsgNoConn:	DB	"No se pudo conectar con la camara.",13,10,'$'
 MsgTimeout:	DB	"La camara dejo de mandar.",13,10,'$'
 MsgNoUrl:	DB	"No hay URL guardada: CAM /U URL",13,10,'$'
+MsgTls:		DB	"Fallo el HTTPS con el servidor",13,10,"(error $"
+MsgNoMem:	DB	"A la Pico no le alcanzo la RAM",13,10,"para el HTTPS.",13,10,'$'
 MsgHttp:	DB	"La camara contesto $"
 MsgAuth:	DB	".",13,10,"Usuario o clave incorrectos?",13,10,'$'
 MsgJpeg:	DB	"La imagen no es un JPEG soportado",13,10,"(error $"
@@ -954,6 +969,7 @@ MsgCrLf:	DB	13,10,'$'
 ; Mensaje de cada resultado de CMD_CAMPOLL (los que llevan datos, aparte)
 ErrTab:		DW	MsgUnknown, MsgNoWifi, MsgNoHost, MsgNoConn, MsgUnknown
 		DW	MsgUnknown, MsgUnknown, MsgTimeout, MsgNoUrl
+		DW	MsgUnknown, MsgNoMem
 
 BsaveHdr:	DB	0xFE
 		DW	0x0000, 0x37FF, 0x0000

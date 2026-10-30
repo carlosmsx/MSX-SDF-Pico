@@ -25,6 +25,7 @@
 #include "dispositivos.h"
 #include "imagenes.h"
 #include "menu_wifi.h"
+#include "mqtt.h"
 #include "ping.h"
 #include "protocolo.h"
 #include "red.h"
@@ -38,8 +39,8 @@ enum { P_FIJO, P_NOMBRE, P_ASCIIZ, P_DOBLE };
 
 typedef struct {
     uint8_t tipo;
-    uint8_t n;      // P_FIJO: cuantos; P_NOMBRE: fijos antes del largo
-                    // P_DOBLE: dos textos con su largo, sin fijos
+    uint8_t n;      // P_FIJO: cuantos; P_NOMBRE y P_DOBLE: fijos antes del
+                    // largo (P_DOBLE: dos textos, cada uno con su largo)
 } params_t;
 
 static params_t params_de(uint8_t cmd)
@@ -70,6 +71,10 @@ static params_t params_de(uint8_t cmd)
     case CMD_FSLIST:                    return (params_t){P_FIJO, 3};
     case CMD_FSREAD: case CMD_FSWRITE:  return (params_t){P_FIJO, 2};
     case CMD_FSREN:                     return (params_t){P_DOBLE, 0};
+    case CMD_MQTTCONN: case CMD_MQTTURL: return (params_t){P_NOMBRE, 0};
+    case CMD_MQTTSUB:                   return (params_t){P_NOMBRE, 1};
+    case CMD_MQTTPUB:                   return (params_t){P_DOBLE, 1};
+    case CMD_MQTTPOLL:                  return (params_t){P_FIJO, 1};
     case CMD_COPROBLQ: case CMD_COPROCUAD: return (params_t){P_FIJO, 2};
     case CMD_COPROINI:                  return (params_t){P_FIJO, 1};
     default:                            return (params_t){P_FIJO, 0};
@@ -80,7 +85,8 @@ static params_t params_de(uint8_t cmd)
 
 enum { E_LIBRE, E_PARAMS, E_DATOS, E_FSDATOS, E_ECO };
 
-#define PAR_MAX     260     // CMD_FSREN: dos rutas de hasta FS_RUTA_MAX
+#define PAR_MAX     520     // CMD_MQTTPUB: flags y dos textos de hasta 255
+#define HOST_BUF    256     // CMD_NETCONN y CMD_PINGSEND (la pila del nucleo 1 es chica)
 #define IO_SECTORES 255     // lo maximo que pide un DSKIO
 
 static int etapa = E_LIBRE;
@@ -150,8 +156,8 @@ static bool params_completos(void)
     case P_FIJO:   return npar >= p.n;
     case P_NOMBRE: return npar > p.n && npar >= p.n + 1 + par[p.n];
     case P_ASCIIZ: return npar > 0 && par[npar - 1] == 0;
-    case P_DOBLE:  return npar > 0 && npar > 1 + par[0]
-                          && npar >= 2 + par[0] + par[1 + par[0]];
+    case P_DOBLE:  return npar > p.n && npar > p.n + 1 + par[p.n]
+                          && npar >= p.n + 2 + par[p.n] + par[p.n + 1 + par[p.n]];
     }
     return true;
 }
@@ -392,16 +398,16 @@ static void ejecutar(void)
         return;
 
     case CMD_NETCONN: {
-        char host[PAR_MAX];
-        uint32_t largo = par[2] < PAR_MAX - 3 ? par[2] : PAR_MAX - 3;
+        char host[HOST_BUF];
+        uint32_t largo = par[2] < HOST_BUF - 1 ? par[2] : HOST_BUF - 1;
         memcpy(host, par + 3, largo);
         host[largo] = 0;
         resp[n++] = red_conectar(host, par[0] | (par[1] << 8));
         break;
     }
     case CMD_PINGSEND: {
-        char host[PAR_MAX];
-        uint32_t largo = par[0] < PAR_MAX - 1 ? par[0] : PAR_MAX - 1;
+        char host[HOST_BUF];
+        uint32_t largo = par[0] < HOST_BUF - 1 ? par[0] : HOST_BUF - 1;
         memcpy(host, par + 1, largo);
         host[largo] = 0;
         resp[n++] = ping_pedir(host);
@@ -426,6 +432,24 @@ static void ejecutar(void)
         memset(par, 0, sizeof par);     // la clave
         break;
     case CMD_CAMVER:    bus_tx_enviar(io_buf, cam_url_visible((char *)io_buf)); break;
+
+    // MQTT (mqtt.c): el cliente corre en el nucleo 0, MQTT.COM consulta
+    case CMD_MQTTCONN:
+        resp[n++] = mqtt_conectar((char *)par + 1, par[0]);
+        memset(par, 0, sizeof par);     // la clave, si la URL la lleva
+        break;
+    case CMD_MQTTCLOSE: resp[n++] = mqtt_conectar(NULL, 0); break;
+    case CMD_MQTTSUB:   resp[n++] = mqtt_suscribir(par[0], (char *)par + 2, par[1]); break;
+    case CMD_MQTTPUB:
+        resp[n++] = mqtt_publicar(par[0], (char *)par + 2, par[1],
+                                  par + 3 + par[1], par[2 + par[1]]);
+        break;
+    case CMD_MQTTPOLL:  bus_tx_enviar(io_buf, mqtt_leer(par[0], io_buf)); break;
+    case CMD_MQTTURL:
+        resp[n++] = mqtt_guardar_url((char *)par + 1, par[0]);
+        memset(par, 0, sizeof par);     // la clave
+        break;
+    case CMD_MQTTVER:   bus_tx_enviar(io_buf, mqtt_url_visible((char *)io_buf)); break;
 
     // Actualizacion del firmware (actualizar.c): la hace el nucleo 0, SDF UPDATE consulta
     case CMD_UPDATE:    resp[n++] = act_pedir(par[0], par[1]); break;
@@ -551,6 +575,7 @@ static void ejecutar(void)
     case CMD_INIHRD:
         fs_reiniciar();
         red_conectar("", 0);
+        mqtt_conectar(NULL, 0);
         break;
 
     default:            break;  // INIENV, MTOFF, GETDPB...: sin respuesta

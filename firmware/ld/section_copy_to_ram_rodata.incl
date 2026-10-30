@@ -1,7 +1,8 @@
 /* Reemplaza al del SDK (pico_add_linker_script_override_path en
    CMakeLists.txt). Con copy_to_ram todo va a la RAM salvo .flashdata; aca
-   se suman el codigo y las constantes de mbedTLS, lwIP, el Wi-Fi y la
-   conversion de la camara, que no entran en la RAM junto al resto y el TLS.
+   se suman el codigo y las constantes de mbedTLS, lwIP, el Wi-Fi, la
+   conversion de la camara y el cliente MQTT, que no entran en la RAM junto
+   al resto y el TLS.
 
    Es codigo que solo corre en el nucleo 0 (archivos enteros: nada que llame
    el nucleo 1), y el 0 graba la flash con las interrupciones cortadas
@@ -25,6 +26,7 @@ SECTIONS
         *src/sc2.c.obj(.text* .rodata*)
         *src/wifi.c.obj(.text* .rodata*)
         *src/https.c.obj(.text* .rodata*)
+        *src/mqtt_red.c.obj(.text* .rodata*)
         . = ALIGN(4);
     } > TEXT_STORE
 }

@@ -247,20 +247,22 @@ static int bio_recibir(void *ctx, unsigned char *buf, size_t n)
 
 // ---- TLS ----
 //
-// La RAM libre no alcanza para todo lo que pide mbedTLS: el bufer de
-// entrada (16 KB y algo, lo mas grande que pide) va en la banda de la
-// conversion de la camara (sc2_prestar), y lo demas, con calloc.
+// La RAM libre no alcanza para todo lo que pide mbedTLS junto a lo de
+// SDF UPDATE: el bufer de entrada (16 KB y algo, lo mas grande que pide) va
+// en la banda de la conversion de la camara (sc2_prestar), y lo demas, con
+// calloc. La camara convierte mientras lee: ahi va todo con calloc.
 
 static uint8_t *prestada;
 static size_t n_prestada;
 static bool prestada_en_uso;
+static bool camara;             // https_camara: sin la banda y sin verificar
 
 static void *mem_pedir(size_t n, size_t t)
 {
     if (t && n > SIZE_MAX / t)
         return NULL;
     size_t b = n * t;
-    if (!prestada_en_uso && b > 8192 && b <= n_prestada) {
+    if (!camara && !prestada_en_uso && b > 8192 && b <= n_prestada) {
         prestada_en_uso = true;
         return prestada;            // en cero: sc2_prestar
     }
@@ -326,7 +328,7 @@ static int tls_abrir(const char *host)
     int r = mbedtls_ctr_drbg_seed(&azar, mbedtls_entropy_func, &entropia,
                                   (const unsigned char *)quien, sizeof quien - 1);
     // Las raices se leen de la flash, sin copiarlas
-    for (int i = 0; r == 0 && i < n_raices; i++)
+    for (int i = 0; r == 0 && !camara && i < n_raices; i++)
         r = mbedtls_x509_crt_parse_der_nocopy(&cas, raices[i].der, raices[i].largo);
     if (r == 0)
         r = mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_CLIENT,
@@ -334,7 +336,8 @@ static int tls_abrir(const char *host)
                                         MBEDTLS_SSL_PRESET_DEFAULT);
     if (r != 0)
         return tls_falla(r);
-    mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_REQUIRED);
+    mbedtls_ssl_conf_authmode(&conf, camara ? MBEDTLS_SSL_VERIFY_NONE
+                                            : MBEDTLS_SSL_VERIFY_REQUIRED);
     mbedtls_ssl_conf_ca_chain(&conf, &cas, NULL);
     mbedtls_ssl_conf_rng(&conf, mbedtls_ctr_drbg_random, &azar);
     r = mbedtls_ssl_setup(&ssl, &conf);
@@ -517,6 +520,11 @@ int https_leer(uint8_t *buf, int n)
     if (restan > 0)
         restan -= m;
     return m;
+}
+
+void https_camara(bool si)
+{
+    camara = si;
 }
 
 void https_cerrar(void)

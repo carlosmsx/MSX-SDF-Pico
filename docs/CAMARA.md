@@ -1,16 +1,18 @@
 # Cámara IP
 
-El SDF-Pico puede sacar una foto de una cámara IP de la red y mostrarla en
-SCREEN 2. La Pico baja la imagen JPEG por HTTP, la convierte a SCREEN 2 y el
-MSX solo copia el resultado al VDP. El firmware está en
-`firmware/src/camara.c` (la conexión) y `firmware/src/sc2.c` (la conversión);
-el programa de MSX-DOS, en `comandos/cam.asm`.
+El SDF-Pico puede sacar una foto de una cámara IP de la red, o de una cámara
+pública de internet, y mostrarla en SCREEN 2. La Pico baja la imagen JPEG por
+HTTP o HTTPS, la convierte a SCREEN 2 y el MSX solo copia el resultado al
+VDP. El firmware está en `firmware/src/camara.c` (la conexión),
+`firmware/src/https.c` (el HTTPS) y `firmware/src/sc2.c` (la conversión); el
+programa de MSX-DOS, en `comandos/cam.asm`.
 
-> **Estado: sin probar con hardware.** El firmware 0.11 compila sin avisos.
-> La conversión se probó en la PC con una foto real de la cámara
-> (`sc2.c` compilado con MSVC), y `CAM.COM` en WebMSX con una Pico simulada
-> (`tools/webmsx_pico_cam.js`). Falta probar la conexión con la cámara desde
-> la Pico.
+> **Estado.** Con el firmware 0.15, una foto pública por HTTPS se probó en
+> la Pico desde la consola USB (`camara foto`). La conversión se probó en la
+> PC con una foto real de una cámara de la red (`sc2.c` compilado con MSVC),
+> y `CAM.COM` en WebMSX con una Pico simulada (`tools/webmsx_pico_cam.js`).
+> Falta probar `CAM.COM` en un MSX y una cámara de la red por HTTP desde la
+> Pico.
 
 ## Qué cámaras sirven
 
@@ -25,10 +27,16 @@ llaman *snapshot*. La mayoría de las cámaras con ONVIF lo tienen. Por ejemplo:
 
 Condiciones:
 
-- **HTTP sin cifrar.** No hay HTTPS: las cámaras que lo usan suelen aceptar
-  también HTTP en el puerto 80.
-- **Autenticación Basic** (`usuario:clave@` en la URL). Las cámaras que solo
-  aceptan Digest no sirven todavía.
+- **HTTP, o HTTPS desde el firmware 0.15.** Por HTTP, con autenticación
+  Basic (`usuario:clave@` en la URL); las cámaras que solo aceptan Digest no
+  sirven todavía. Por HTTPS, sin usuario ni clave: sirve para las fotos
+  públicas de internet. Se sigue hasta 5 redirecciones.
+- **Por HTTPS, el certificado no se verifica.** La conexión va cifrada,
+  pero la Pico no comprueba quién es el servidor: así sirve cualquiera,
+  aunque su certificado sea propio o de una autoridad que la Pico no conoce.
+  Como por HTTPS no se manda usuario ni clave, lo peor que puede hacer un
+  servidor falso es mostrar otra foto. `SDF UPDATE`, en cambio, sí verifica
+  el certificado de GitHub (`ACTUALIZAR.md`).
 - **JPEG *baseline*.** El progresivo no está soportado; las fotos de las
   cámaras no lo usan.
 - Hasta unos 3000 píxeles de ancho (2560x1440 y 3840x2160 entran).
@@ -65,7 +73,8 @@ CAM /U [URL | -]
 | `CAM /U -` | Olvida la URL guardada |
 
 La URL es `http://usuario:clave@host:puerto/ruta`. El `http://`, el usuario
-y el puerto (80) se pueden omitir. Ejemplo:
+y el puerto (80) se pueden omitir. Por HTTPS es `https://host:puerto/ruta`,
+sin usuario, y el puerto (443) también se puede omitir. Ejemplo:
 
 ```
 B>CAM /U http://claude:clave@192.168.1.3/ISAPI/Streaming/channels/102/picture
@@ -132,6 +141,7 @@ Deja `FOTO.SC2` (para `BLOAD`), `FOTO.png` (lo que se vería) y `FOTO_cmp.png`
 |---|---|
 | `camara` | La URL guardada (sin la clave) y el resultado de la última foto |
 | `camara foto` | Saca una foto con la URL guardada y dice cuánto tardó: en total y hasta la respuesta de la cámara |
+| `camara url URL` | Guarda la URL, como `CAM /U` (`camara url -` la olvida) |
 
 ## Comandos del protocolo
 
@@ -164,10 +174,12 @@ Estado: 0 = no se pidió nada, 1 = en curso, 2 = lista. Con el estado en 2:
 | 2 | El nombre no se resolvió | — |
 | 3 | No conectó, o se cortó antes de terminar | — |
 | 4 | La cámara no contestó 200 | El código HTTP (401: usuario o clave) |
-| 5 | TJpgDec no entiende la imagen | El error de TJpgDec (8: JPEG progresivo) |
+| 5 | TJpgDec no entiende la imagen (o no llegó una imagen) | El error de TJpgDec (8: JPEG progresivo) |
 | 6 | Tamaño no soportado | — |
 | 7 | La cámara dejó de mandar (8 s sin datos) | — |
-| 8 | No hay URL guardada | — |
+| 8 | No hay URL guardada (o una redirección no sirve) | — |
+| 9 | Falló el HTTPS | El error de mbedTLS, en positivo |
+| 10 | No alcanzó la RAM para el HTTPS | — |
 
 Ancho y alto son los del JPEG; el tiempo, desde el pedido hasta el final.
 
@@ -204,8 +216,16 @@ consola y el Wi-Fi esperan, pero el bus (núcleo 1) sigue atendiendo al MSX.
 Lo recibido se queda en los búferes de lwIP hasta que el decodificador lo
 pide, así que no hace falta un búfer para el JPEG. La conversión usa unos
 40 KB: la banda (20 KB), la pantalla (12 KB), la memoria de TJpgDec (5 KB) y
-el error de la difusión (3 KB). Con el firmware 0.11 quedan unos 6 KB de RAM
-libres.
+el error de la difusión (3 KB).
 
-En la PC, la conversión de una foto de 704x576 tarda unos 60 ms. En la Pico
-falta medirlo (`camara foto` en la consola).
+Por HTTPS, mbedTLS pide además unos 40 KB de la RAM libre mientras dura la
+conexión. En SDF UPDATE el búfer de entrada del TLS (16 KB) va prestado en
+la banda de la conversión, pero la cámara la usa mientras lee, así que ahí
+sale todo de la RAM libre: con el firmware 0.15 quedan unos 59 KB, y con el
+0.16 (que suma MQTT) unos 52 KB.
+
+Medido en la Pico con una foto de 640x360 por HTTPS: entre 0,6 y 1,3 s
+hasta la respuesta (DNS, TCP y el TLS) y unos 2,5 s más para bajarla y
+convertirla, entre 3 y 4 s en total. Desde el firmware 0.14 la conversión
+corre desde la flash, para dejarle la RAM al TLS. En la PC, la conversión de
+una foto de 704x576 tarda unos 60 ms.
