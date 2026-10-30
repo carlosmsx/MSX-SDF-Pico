@@ -1,4 +1,4 @@
-; Motor de los juegos que corren en la Pico (CUEVA.COM).
+; Motor de los juegos que corren en la Pico (CUEVA.COM, PLANETAS.COM).
 ;
 ; El programa no sabe nada del juego: en cada interrupcion lee la entrada,
 ; se la manda a la Pico y copia lo que vuelve:

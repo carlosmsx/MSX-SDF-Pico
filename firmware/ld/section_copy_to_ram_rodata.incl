@@ -9,10 +9,11 @@
    (ajustes.c, actualizar.c), asi que nadie lo ejecuta mientras la flash no
    se puede leer.
 
-   Excepcion: los juegos de la Pico como coprocesador (copro.c y cueva.c) los
-   llama el nucleo 1, pero solo mientras COPRO.COM o CUEVA.COM corren en el
-   MSX, y entonces el MSX no pide nada que grabe la flash. Es lo mismo que ya
-   se supone con el disco, que el nucleo 1 lee directo de la flash. */
+   Excepcion: los juegos de la Pico como coprocesador (copro.c, cueva.c,
+   planetas.c) los llama el nucleo 1, pero solo mientras COPRO.COM,
+   CUEVA.COM o PLANETAS.COM corren en el MSX, y entonces el MSX no pide nada
+   que grabe la flash. Es lo mismo que ya se supone con el disco, que el
+   nucleo 1 lee directo de la flash. */
 
 SECTIONS
 {
@@ -34,6 +35,7 @@ SECTIONS
         *src/mqtt_red.c.obj(.text* .rodata*)
         *src/copro.c.obj(.text* .rodata*)
         *src/cueva.c.obj(.text* .rodata*)
+        *src/planetas.c.obj(.text* .rodata*)
         . = ALIGN(4);
     } > TEXT_STORE
 }

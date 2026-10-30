@@ -45,6 +45,7 @@ Comandos:
 | 03h | NADA | Cancela el eco y el DMA |
 | 04h-06h | COPRO... | La Pico como coprocesador de juegos (ver `COPRO.md`) |
 | 07h-08h | CUEVA... | Un juego que corre en la Pico (ver `CUEVA.md`) |
+| 09h-0Ah | PLANETAS... | El sistema solar calculado en la Pico (ver `PLANETAS.md`) |
 
 ## Secuencia
 

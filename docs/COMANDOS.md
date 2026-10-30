@@ -5,7 +5,7 @@ fuentes están en `comandos/` y se ensamblan con `python tools/comandos.py`,
 que los deja en `out/msx/`. Los que usan la Pico están en la documentación de
 cada tema: `PING.COM` y `GET.COM` en `RED.md`, `WIFI.COM` en `WIFI.md`,
 `SDF.COM` en `SD.md`, `SD.COM` en `ARCHIVOS.md`, `CAM.COM` en `CAMARA.md`,
-`MQTT.COM` en `MQTT.md`, `COPRO.COM` en `COPRO.md`, el juego `CUEVA.COM` en `CUEVA.md`, y el editor `VI.COM` en `VI.md`.
+`MQTT.COM` en `MQTT.md`, `COPRO.COM` en `COPRO.md`, el juego `CUEVA.COM` en `CUEVA.md`, el sistema solar `PLANETAS.COM` en `PLANETAS.md`, y el editor `VI.COM` en `VI.md`.
 
 ## GREP.COM
 

@@ -30,6 +30,7 @@ set(FUENTES
     src/camara.c
     src/copro.c
     src/cueva.c
+    src/planetas.c
     src/sc2.c
     src/https.c
     src/raices.c

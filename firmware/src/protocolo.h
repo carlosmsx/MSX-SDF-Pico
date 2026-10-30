@@ -25,6 +25,9 @@
 // CUEVA, un juego que corre en la Pico (cueva.h, docs/CUEVA.md)
 #define CMD_CUEVAINI      0x07  // contesta el PSG y los tramos de VRAM de la pantalla inicial
 #define CMD_CUEVACUAD     0x08  // joystick, filas 5 y 2; contesta el PSG y los tramos del cuadro
+// PLANETAS, el sistema solar calculado en la Pico (planetas.h, docs/PLANETAS.md)
+#define CMD_PLANETASINI   0x09  // contesta el PSG y los tramos de VRAM de SCREEN 2
+#define CMD_PLANETASCUAD  0x0A  // joystick y filas 0 a 8; contesta el PSG y los tramos del cuadro
 
 // 0x9x: dispositivos de BASIC
 #define CMD_DEVNAME       0x90

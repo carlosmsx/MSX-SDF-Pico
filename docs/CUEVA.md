@@ -5,8 +5,8 @@ completo en el que la Pico hace todo (el mapa, el movimiento, las
 colisiones, los puntos y la música) y el MSX solo copia lo que recibe.
 `CUEVA.COM` no sabe nada del juego: en cada cuadro manda la entrada y copia
 a la VRAM y al PSG lo que vuelve. El juego está en `firmware/src/cueva.c`; el
-programa, en `comandos/cueva.asm`, con el motor de
-`comandos/juego.inc`.
+programa, en `comandos/cueva.asm`, con el motor que comparte con
+`PLANETAS.COM` en `comandos/juego.inc`.
 
 > **Estado.** Firmware 0.17. La lógica del juego y `CUEVA.COM` se probaron
 > fuera de la placa; falta probar en la Pico y en un MSX.

@@ -85,7 +85,7 @@ En la DPC-200, que funciona a 50 Hz (71.591 ciclos por cuadro):
   sprites (896 bytes) y sobran unos 1.400 para patrones. Solo en el borde de
   abajo (unos 27.600 ciclos a 50 Hz) entran unos 1.100 bytes a 24 ciclos.
 
-Un juego completo hecho así está en `CUEVA.md`.
+Un juego completo hecho así está en `CUEVA.md`, y un ejemplo de cálculo pesado (el sistema solar con la ecuación de Kepler) en `PLANETAS.md`.
 
 ## Comandos
 

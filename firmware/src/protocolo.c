@@ -22,6 +22,7 @@
 #include "camara.h"
 #include "copro.h"
 #include "cueva.h"
+#include "planetas.h"
 #include "consola.h"
 #include "dispositivos.h"
 #include "imagenes.h"
@@ -78,6 +79,7 @@ static params_t params_de(uint8_t cmd)
     case CMD_MQTTPOLL:                  return (params_t){P_FIJO, 1};
     case CMD_COPROBLQ: case CMD_COPROCUAD: return (params_t){P_FIJO, 2};
     case CMD_CUEVACUAD:                 return (params_t){P_FIJO, 3};
+    case CMD_PLANETASCUAD:              return (params_t){P_FIJO, PLANETAS_ENTRADA};
     case CMD_COPROINI:                  return (params_t){P_FIJO, 1};
     default:                            return (params_t){P_FIJO, 0};
     }
@@ -100,6 +102,8 @@ static uint8_t resp[128];
 // Los sectores de un DSKIO entero: se leen de la SD de una vez y salen por
 // DMA; en escritura se juntan aca y se graban al final.
 static uint8_t io_buf[IO_SECTORES * SECTOR];
+_Static_assert(sizeof io_buf >= PLANETAS_RESPUESTA + PLANETAS_MEMORIA,
+               "PLANETAS guarda sus imagenes en io_buf");
 
 // CMD_READ en curso: para comparar el checksum que manda CMD_DEBUG
 static const uint8_t *lec_ptr;
@@ -573,6 +577,8 @@ static void ejecutar(void)
     case CMD_COPROCUAD: bus_tx_enviar(io_buf, copro_cuadro(par[0], par[1], io_buf)); break;
     case CMD_CUEVAINI:  bus_tx_enviar(io_buf, cueva_iniciar(io_buf)); break;
     case CMD_CUEVACUAD: bus_tx_enviar(io_buf, cueva_cuadro(par[0], par[1], par[2], io_buf)); break;
+    case CMD_PLANETASINI:  bus_tx_enviar(io_buf, planetas_iniciar(io_buf)); break;
+    case CMD_PLANETASCUAD: bus_tx_enviar(io_buf, planetas_cuadro(par, io_buf)); break;
 
     // Lo primero que manda la DiskROM despues de cada reset: lo que haya
     // quedado de antes (un archivo abierto, una conexion) no vale.
