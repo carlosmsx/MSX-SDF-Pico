@@ -44,6 +44,7 @@ Comandos:
 | 02h | CONTADOR | El DMA entrega 00h, 01h, ..., FFh en lecturas sucesivas de 00h |
 | 03h | NADA | Cancela el eco y el DMA |
 | 04h-06h | COPRO... | La Pico como coprocesador de juegos (ver `COPRO.md`) |
+| 07h-08h | CUEVA... | Un juego que corre en la Pico (ver `CUEVA.md`) |
 
 ## Secuencia
 

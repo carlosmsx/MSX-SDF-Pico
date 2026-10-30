@@ -22,6 +22,9 @@
 #define CMD_COPROBLQ      0x04  // n, semilla; contesta n bloques de 256 bytes
 #define CMD_COPROINI      0x05  // sprites; contesta el patron de 16x16 (32 bytes)
 #define CMD_COPROCUAD     0x06  // joystick, fila 8; contesta la tabla de sprites (128 bytes)
+// CUEVA, un juego que corre en la Pico (cueva.h, docs/CUEVA.md)
+#define CMD_CUEVAINI      0x07  // contesta el PSG y los tramos de VRAM de la pantalla inicial
+#define CMD_CUEVACUAD     0x08  // joystick, filas 5 y 2; contesta el PSG y los tramos del cuadro
 
 // 0x9x: dispositivos de BASIC
 #define CMD_DEVNAME       0x90

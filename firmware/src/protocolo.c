@@ -21,6 +21,7 @@
 #include "bus.h"
 #include "camara.h"
 #include "copro.h"
+#include "cueva.h"
 #include "consola.h"
 #include "dispositivos.h"
 #include "imagenes.h"
@@ -76,6 +77,7 @@ static params_t params_de(uint8_t cmd)
     case CMD_MQTTPUB:                   return (params_t){P_DOBLE, 1};
     case CMD_MQTTPOLL:                  return (params_t){P_FIJO, 1};
     case CMD_COPROBLQ: case CMD_COPROCUAD: return (params_t){P_FIJO, 2};
+    case CMD_CUEVACUAD:                 return (params_t){P_FIJO, 3};
     case CMD_COPROINI:                  return (params_t){P_FIJO, 1};
     default:                            return (params_t){P_FIJO, 0};
     }
@@ -569,6 +571,8 @@ static void ejecutar(void)
     case CMD_COPROBLQ:  bus_tx_enviar(io_buf, copro_bloques(par[0], par[1], io_buf)); break;
     case CMD_COPROINI:  bus_tx_enviar(io_buf, copro_iniciar(par[0], io_buf)); break;
     case CMD_COPROCUAD: bus_tx_enviar(io_buf, copro_cuadro(par[0], par[1], io_buf)); break;
+    case CMD_CUEVAINI:  bus_tx_enviar(io_buf, cueva_iniciar(io_buf)); break;
+    case CMD_CUEVACUAD: bus_tx_enviar(io_buf, cueva_cuadro(par[0], par[1], par[2], io_buf)); break;
 
     // Lo primero que manda la DiskROM despues de cada reset: lo que haya
     // quedado de antes (un archivo abierto, una conexion) no vale.
