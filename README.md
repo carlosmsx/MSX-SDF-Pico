@@ -99,6 +99,7 @@ varios formatos. El detalle de cada función está en la documentación.
 | Documento | Contenido |
 |---|---|
 | [hardware/CABLEADO.md](hardware/CABLEADO.md) | Modificación de la placa y cableado de la Pico |
+| [docs/BASIC.md](docs/BASIC.md) | Manual de BASIC: todos los `CALL` y `OPEN "RTC:"`, con sus errores |
 | [docs/SD.md](docs/SD.md) | La tarjeta, las imágenes, los `CALL SDF*` y `SDF.COM` |
 | [docs/ARCHIVOS.md](docs/ARCHIVOS.md) | Los archivos de la SD desde el MSX: `SD.COM` y la API |
 | [docs/WIFI.md](docs/WIFI.md) | El Wi-Fi, `CALL WIFI`, `WIFI.COM` y la consola USB |
